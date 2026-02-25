@@ -30,8 +30,8 @@ class AnalyzeResponse(BaseModel):
     
     label: Optional[str] = Field(
         None,
-        description="Classification label: 'real' or 'fake'. None if no face detected.",
-        pattern="^(real|fake)$"
+        description="Classification label: 'real', 'uncertain', or 'fake'. None if no face detected.",
+        pattern="^(real|uncertain|fake)$"
     )
     
     # Findings
@@ -70,7 +70,7 @@ class AnalyzeResponse(BaseModel):
             "example": {
                 "face_detected": True,
                 "confidence": 0.87,
-                "label": "fake",
+                "label": "uncertain",
                 "findings": [
                     "🔴 Unnatural skin texture around jaw",
                     "🟢 Eyes appear symmetrical",
