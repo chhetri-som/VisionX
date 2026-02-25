@@ -9,10 +9,10 @@ VisionX FastAPI Backend
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional, List, Dict, Any, Tuple
 import cv2
 import numpy as np
 import time
-import logging
 from pathlib import Path
 
 from app.core.config import (
@@ -24,6 +24,8 @@ from app.core.logging_config import setup_logging, get_logger
 from app.core.face_detector import FaceDetector
 from app.core.deepfake_classifier import DeepfakeClassifier, DummyClassifier
 from app.schemas.responses import AnalyzeResponse, HealthResponse
+from app.core.findings_engine import FindingsEngine
+from app.core.saliency_mapper import SaliencyMapper
 
 # Setup logging
 setup_logging("INFO")
@@ -54,6 +56,8 @@ app.add_middleware(
 
 face_detector = None
 deepfake_classifier = None
+saliency_mapper = None
+findings_engine = None
 
 # ============================================================================
 # Startup Event - Load Models
@@ -62,7 +66,7 @@ deepfake_classifier = None
 @app.on_event("startup")
 async def startup_event():
     """Load models when server starts."""
-    global face_detector, deepfake_classifier
+    global face_detector, deepfake_classifier, saliency_mapper, findings_engine
     
     logger.info("🚀 VisionX Backend Startup")
     logger.info("=" * 60)
@@ -91,6 +95,27 @@ async def startup_event():
         logger.warning("   Using DummyClassifier for testing")
         deepfake_classifier = DummyClassifier()
     
+    # Initialize saliency mapper after classifier is loaded
+    try:
+        if deepfake_classifier is not None:
+            from app.core.config import SALIENCY_PATCH_SIZE
+            saliency_mapper = SaliencyMapper(deepfake_classifier, SALIENCY_PATCH_SIZE)
+            logger.info("✅ SaliencyMapper initialized")
+        else:
+            logger.warning("⚠️  Cannot initialize SaliencyMapper: no classifier")
+            saliency_mapper = None
+    except Exception as e:
+        logger.error(f"❌ SaliencyMapper failed: {e}")
+        saliency_mapper = None
+    
+    # Initialize findings engine
+    try:
+        findings_engine = FindingsEngine()
+        logger.info("✅ FindingsEngine initialized")
+    except Exception as e:
+        logger.error(f"❌ FindingsEngine failed: {e}")
+        findings_engine = None
+    
     logger.info("=" * 60)
     logger.info("✅ Startup complete\n")
 
@@ -110,7 +135,7 @@ async def health_check():
     
     Useful for frontend to verify backend is ready before allowing uploads.
     """
-    models_ready = face_detector is not None and deepfake_classifier is not None
+    models_ready = face_detector is not None and deepfake_classifier is not None and saliency_mapper is not None and findings_engine is not None
     
     return HealthResponse(
         status="ok" if models_ready else "error",
@@ -126,249 +151,103 @@ async def health_check():
 async def analyze_image(image: UploadFile = File(...)):
     """
     Analyze uploaded image for deepfakes.
-    
-    Pipeline:
-    1. Validate image (format, size)
-    2. Decode image
-    3. Detect face using MediaPipe
-    4. Classify face using EfficientNet-B0
-    5. Generate saliency heatmap
-    6. Return results
-    
-    Args:
-        image: File upload (JPEG/PNG, max 10MB)
-    
-    Returns:
-        AnalyzeResponse with:
-        - confidence: 0-1 score (1 = fake)
-        - findings: list of observations
-        - heatmap_data: 2D array of saliency scores
-        - metadata
+    - Saliency Grid: 14x14
+    - Confidence: 0-1 (EfficientNet-B0)
+    - Findings: Spatial analysis based on heatmap
     """
-    
     start_time = time.time()
     
     try:
         # ====================================================================
         # Step 1: Validate and decode image
         # ====================================================================
-        
         contents = await image.read()
-        
-        # Check file size
         file_size_mb = len(contents) / (1024 * 1024)
         if file_size_mb > MAX_IMAGE_SIZE_MB:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Image exceeds {MAX_IMAGE_SIZE_MB}MB limit (received {file_size_mb:.1f}MB)"
-            )
+            raise HTTPException(status_code=400, detail=f"Image exceeds limit")
         
-        # Decode image
+        if image.content_type not in ['image/jpeg', 'image/png']:
+            raise HTTPException(status_code=400, detail="Invalid file type.")
+        
         nparr = np.frombuffer(contents, np.uint8)
         image_array = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
-        if image_array is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid image format. Use JPEG or PNG."
-            )
-        
-        if image_array.size == 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Image is empty or corrupted"
-            )
-        
-        logger.info(f"Image decoded: {image_array.shape}")
+        if image_array is None or image_array.size == 0:
+            raise HTTPException(status_code=400, detail="Failed to decode image.")
         
         # ====================================================================
-        # Step 2: Check models are loaded
+        # Step 2: Check models
         # ====================================================================
-        
-        if face_detector is None:
-            raise HTTPException(
-                status_code=500,
-                detail="Face detector not loaded. Server may be initializing."
-            )
-        
-        if deepfake_classifier is None:
-            raise HTTPException(
-                status_code=500,
-                detail="Deepfake classifier not loaded. Server may be initializing."
-            )
-        
+        # Note: Ensure these are initialized in your AppState or globally
+        if face_detector is None or deepfake_classifier is None or findings_engine is None:
+            raise HTTPException(status_code=500, detail="Models not loaded.")
+            
         # ====================================================================
-        # Step 3: Detect face
+        # Step 3 & 4: Detect and Crop face
         # ====================================================================
-        
         face_result = face_detector.detect(image_array)
         
-        if not face_result['detected']:
-            logger.info("No face detected")
-            return AnalyzeResponse(
-                face_detected=False,
-                error="No face detected in image. Try a clearer photo."
-            )
+        if not face_result.get('detected', False):
+            return AnalyzeResponse(face_detected=False, error="No face detected.")
         
         bbox = face_result['bbox']
-        logger.info(f"Face detected: bbox={bbox}")
-        
-        # ====================================================================
-        # Step 4: Crop and validate face region
-        # ====================================================================
-        
         face_crop = face_detector.crop_face(image_array, bbox)
         
-        if face_crop is None or face_crop.size == 0:
-            return AnalyzeResponse(
-                face_detected=True,
-                error="Face region too small or invalid. Try a closer image."
-            )
-        
-        # Check minimum face size (need at least 50×50)
+        # Check minimum face size for model reliability
         h, w = face_crop.shape[:2]
         if h < 50 or w < 50:
-            return AnalyzeResponse(
-                face_detected=True,
-                error=f"Detected face too small ({h}×{w}px). Try a closer image."
-            )
-        
-        logger.info(f"Face cropped: {face_crop.shape}")
+            return AnalyzeResponse(face_detected=True, error="Face too small.")
+
+        # ====================================================================
+        # Step 5: Classify face
+        # ====================================================================
+        # Standardize face size to 224x224 before inference/saliency
+        face_crop_resized = cv2.resize(face_crop, (224, 224))
+        confidence = float(deepfake_classifier.classify(face_crop_resized))
+        confidence = max(0.0, min(1.0, confidence))
         
         # ====================================================================
-        # Step 5: Classify face as real or fake
+        # Step 6: Generate saliency heatmap (Decision 3: 14x14)
         # ====================================================================
-        
-        confidence = deepfake_classifier.classify(face_crop)
-        logger.info(f"Classification confidence: {confidence:.3f}")
-        
-        # Validate confidence is in [0, 1]
-        confidence = max(0, min(1, confidence))
-        
-        # ====================================================================
-        # Step 6: Generate saliency heatmap (optional, can be slow)
-        # ====================================================================
-        
-        heatmap = None
-        if SALIENCY_ENABLED:
-            try:
-                # For Week 1, we'll use a dummy heatmap
-                # In Week 4, implement actual occlusion sensitivity
-                heatmap = _generate_dummy_heatmap(face_crop, confidence)
-                logger.info(f"Heatmap generated: {heatmap.shape}")
-            except Exception as e:
-                logger.warning(f"Heatmap generation failed: {e}")
-                heatmap = None
+        heatmap_list = []
+        try:
+            # FIX: The method name in the new class is .compute(), not .compute_saliency()
+            heatmap_list = saliency_mapper.compute(face_crop_resized, verbose=False)
+        except Exception as e:
+            logger.warning(f"Heatmap generation failed: {e}")
+            # Fallback to empty 14x14 grid
+            heatmap_list = [[0.0 for _ in range(14)] for _ in range(14)]
         
         # ====================================================================
-        # Step 7: Generate human-readable findings
+        # Step 7: Generate findings (Decision 2: Rule-based Engine)
         # ====================================================================
-        
-        findings = _generate_findings(confidence)
+        # FIX: Using findings_engine instance and capturing both label and findings
+        label, findings = findings_engine.generate_findings(confidence, heatmap_list)
         
         # ====================================================================
         # Step 8: Return response
         # ====================================================================
-        
         execution_time = int((time.time() - start_time) * 1000)
-        
-        logger.info(f"Analysis complete: {execution_time}ms")
         
         return AnalyzeResponse(
             face_detected=True,
             confidence=round(confidence, 3),
-            label="fake" if confidence >= 0.5 else "real",
-            findings=findings,
-            heatmap_data=heatmap.tolist() if heatmap is not None else None,
+            label=label,                 # "real", "uncertain", or "fake"
+            findings=findings,           # Dynamic spatial findings
+            heatmap_data=heatmap_list,   # 14x14 grid
             execution_time_ms=execution_time,
             model_details={
                 "face_model": "MediaPipe Face Landmarker v1",
-                "deepfake_model": "EfficientNet-B0 (INT8)",
-                "note": "Using dummy classifier for Week 1 testing"
+                "deepfake_model": "EfficientNet-B0 INT8",
+                "saliency_method": "Occlusion Sensitivity (16px patch)"
             }
         )
     
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
-    
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal error: {str(e)}"
-        )
-
-
-# ============================================================================
-# Helper Functions
-# ============================================================================
-
-def _generate_dummy_heatmap(face_image: np.ndarray, confidence: float) -> np.ndarray:
-    """
-    Generate a dummy saliency heatmap for Week 1.
-    
-    In Week 4, this will be replaced with actual occlusion sensitivity.
-    
-    Args:
-        face_image: cropped face [H, W, 3]
-        confidence: classification confidence [0, 1]
-    
-    Returns:
-        heatmap: [grid_h, grid_w] importance scores [0, 1]
-    """
-    h, w = face_image.shape[:2]
-    grid_h, grid_w = h // 32, w // 32  # 32×32 pixel patches
-    
-    # Create a dummy heatmap
-    # In real implementation, this is occlusion sensitivity
-    np.random.seed(42)  # Deterministic for testing
-    heatmap = np.random.rand(grid_h, grid_w).astype(np.float32)
-    
-    # Weight heatmap by confidence
-    # High confidence (likely fake) → more regions highlighted
-    if confidence > 0.7:
-        heatmap = heatmap ** 0.5  # Brighten (more regions important)
-    elif confidence < 0.3:
-        heatmap = heatmap ** 2.0  # Dim (fewer regions important)
-    
-    # Normalize to [0, 1]
-    heatmap = (heatmap - heatmap.min()) / (heatmap.max() - heatmap.min() + 1e-8)
-    
-    return heatmap
-
-
-def _generate_findings(confidence: float) -> list:
-    """
-    Generate human-readable findings based on confidence score.
-    
-    Args:
-        confidence: float in [0, 1] where 1 = fake
-    
-    Returns:
-        list of finding strings
-    """
-    findings = []
-    
-    if confidence > 0.7:
-        # High confidence in fake
-        findings.append("🔴 Unnatural skin texture around jaw")
-        findings.append("🔴 Face boundary blending artifacts detected")
-        findings.append("🔴 Possible lip/mouth artifacts")
-    elif confidence > 0.5:
-        # Medium confidence in fake
-        findings.append("🟡 Subtle facial asymmetry detected")
-        findings.append("🟡 Possible texture inconsistencies")
-    else:
-        # Low confidence in fake (likely real)
-        findings.append("🟢 Natural skin texture")
-        findings.append("🟢 Facial features appear consistent")
-    
-    # Always include these for credibility
-    findings.append("🟢 Eyes appear symmetrical")
-    findings.append("🟢 Hair boundary appears natural")
-    
-    return findings
+        raise HTTPException(status_code=500, detail="Internal server error.")
 
 
 # ============================================================================
