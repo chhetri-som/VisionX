@@ -1,0 +1,11 @@
+# Create test images directory
+mkdir -p backend/tests/test_images
+
+# You already have test images! Place them here:
+# - Real faces: tests/test_images/real_face_1.jpg, real_face_2.jpg, etc.
+# - Deepfakes: tests/test_images/deepfake_1.jpg, deepfake_2.jpg, etc.
+# - No face: tests/test_images/no_face.jpg
+# - Multiple faces: tests/test_images/multiple_faces.jpg
+
+# Verify structure
+find backend/tests/test_images -type f | head -10

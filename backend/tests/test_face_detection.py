@@ -5,7 +5,7 @@ Run: pytest tests/test_face_detection.py -v
 import cv2
 import numpy as np
 from pathlib import Path
-from app.core.face_detector import FaceDetector
+from app.services.face_detector import FaceDetector
 from app.core.config import FACE_LANDMARKER_PATH
 
 class TestFaceDetection:

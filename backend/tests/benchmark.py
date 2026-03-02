@@ -4,15 +4,15 @@ Measure latency of each pipeline stage.
 """
 import time
 import cv2
-from app.core.face_detector import FaceDetector
-from app.core.deepfake_classifier import DeepfakeClassifier
-from app.core.saliency_mapper import SaliencyMapper
+from app.services.face_detector import FaceDetector
+from app.services.deepfake_classifier import DeepfakeClassifier
+# from app.core.saliency_mapper import SaliencyMapper  # Removed
 
 def benchmark_pipeline():
     # Load models
     detector = FaceDetector(...)
     classifier = DeepfakeClassifier(...)
-    saliency = SaliencyMapper(...)
+    # saliency = SaliencyMapper(...)  # Removed
     
     # Load test image
     image = cv2.imread('tests/fixtures/face_real.jpg')
@@ -35,11 +35,6 @@ def benchmark_pipeline():
     confidence = classifier.classify(face_crop)
     times['inference'] = time.time() - start
     
-    # 4. Saliency
-    start = time.time()
-    heatmap = saliency.compute(face_crop)
-    times['saliency'] = time.time() - start
-    
     # Print results
     print("\n=== Performance Baseline ===")
     for stage, elapsed in times.items():
@@ -48,12 +43,9 @@ def benchmark_pipeline():
     print(f"{'Total':20s}: {total*1000:6.1f}ms")
     
     # Performance targets
-    target_no_saliency = 0.300  # 300ms
-    target_with_saliency = 5.0  # 5s
+    target_pipeline = 0.300  # 300ms
     
-    if total - times['saliency'] > target_no_saliency:
-        print(f"⚠️  WITHOUT saliency exceeds {target_no_saliency}s target!")
-    if total > target_with_saliency:
-        print(f"⚠️  WITH saliency exceeds {target_with_saliency}s target!")
+    if total > target_pipeline:
+        print(f"⚠️  Pipeline exceeds {target_pipeline}s target!")
     else:
         print("✅ Performance acceptable")

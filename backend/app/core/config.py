@@ -44,10 +44,8 @@ MAX_IMAGE_SIZE_MB = 10
 # --- CORS CONFIGURATION ---
 # These are the frontend origins that can make requests to this backend
 CORS_ORIGINS = [
-    "http://localhost:3000",      # Alternative React dev port
     "http://localhost:5173",      # Vite default dev port
     "http://127.0.0.1:5173",      # Loopback variant
-    "http://127.0.0.1:3000",
 ]
 
 # When deploying to production, add your domain:
@@ -59,16 +57,6 @@ CORS_ALLOW_METHODS = ["GET", "POST", "OPTIONS"]
 CORS_ALLOW_HEADERS = ["Content-Type", "Authorization"]
 
 
-# --- SALIENCY MAPPING CONFIGURATION ---
-
-# Size of patches to mask during occlusion sensitivity (pixels)
-# 16×16: More detailed (5-10s per image)
-# 24×24: Balanced (2-3s per image)
-# 32×32: Faster (1-2s per image)
-SALIENCY_PATCH_SIZE = 24  # You chose: accuracy over speed
-
-# Enable/disable saliency for quick testing
-SALIENCY_ENABLED = True
 
 
 # --- LOGGING ---
@@ -99,7 +87,6 @@ if __name__ == "__main__":
     print(f"Base Directory: {BASE_DIR}")
     print(f"Face Model Path: {FACE_LANDMARKER_PATH}")
     print(f"Deepfake Model Path: {DEEPFAKE_MODEL_PATH}")
-    print(f"Saliency Patch Size: {SALIENCY_PATCH_SIZE}×{SALIENCY_PATCH_SIZE}")
     print(f"Max Image Size: {MAX_IMAGE_SIZE_MB} MB")
     print(f"CORS Origins: {CORS_ORIGINS}")
     print("=" * 60)

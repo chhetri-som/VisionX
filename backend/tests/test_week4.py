@@ -7,7 +7,7 @@ Comprehensive test suite for Week 4.
 Covers:
 1. Edge case handling (no face, corrupted image, oversized file, etc.)
 2. Findings engine validation
-3. Saliency mapper output validation
+3. MediaPipe facial analysis validation
 4. API endpoint integration
 5. Error handling
 
@@ -34,8 +34,8 @@ from fastapi.testclient import TestClient
 
 # Import your modules (adjust paths as needed)
 # from app.main import app
-# from app.core.findings_engine import FindingsEngine
-# from app.core.saliency_mapper import SaliencyMapper
+# from app.services.findings_engine import FindingsEngine
+# from app.core.saliency_mapper import SaliencyMapper  # Removed
 
 
 # ============================================================
@@ -96,7 +96,7 @@ class TestFindingsEngine:
     def test_findings_engine_import(self):
         """Verify FindingsEngine can be imported."""
         try:
-            from app.core.findings_engine import FindingsEngine
+            from app.services.findings_engine import FindingsEngine
             engine = FindingsEngine()
             assert engine is not None
         except ImportError:
@@ -104,13 +104,12 @@ class TestFindingsEngine:
     
     def test_findings_real_face(self):
         """Test findings for real face (low confidence)."""
-        from app.core.findings_engine import FindingsEngine
+        from app.services.findings_engine import FindingsEngine
         
         engine = FindingsEngine()
         
         # Low confidence = real
-        heatmap = [[0.1] * 4 for _ in range(4)]  # Uniform low importance
-        label, findings = engine.generate_findings(0.15, heatmap)
+        label, findings = engine.generate_findings(0.15, None)
         
         assert label == "real"
         assert len(findings) > 0
@@ -118,13 +117,12 @@ class TestFindingsEngine:
     
     def test_findings_fake_face(self):
         """Test findings for fake face (high confidence)."""
-        from app.core.findings_engine import FindingsEngine
+        from app.services.findings_engine import FindingsEngine
         
         engine = FindingsEngine()
         
         # High confidence = fake
-        heatmap = [[0.8] * 4 for _ in range(4)]  # High importance
-        label, findings = engine.generate_findings(0.87, heatmap)
+        label, findings = engine.generate_findings(0.87, None)
         
         assert label == "fake"
         assert len(findings) > 0
@@ -132,37 +130,20 @@ class TestFindingsEngine:
     
     def test_findings_uncertain_face(self):
         """Test findings for uncertain case."""
-        from app.core.findings_engine import FindingsEngine
+        from app.services.findings_engine import FindingsEngine
         
         engine = FindingsEngine()
         
         # Medium confidence = uncertain
-        heatmap = [[0.4] * 4 for _ in range(4)]
-        label, findings = engine.generate_findings(0.45, heatmap)
+        label, findings = engine.generate_findings(0.45, None)
         
         assert label == "uncertain"
         assert len(findings) > 0
     
-    def test_findings_with_heatmap_analysis(self):
-        """Test that findings incorporate heatmap region analysis."""
-        from app.core.findings_engine import FindingsEngine
         
-        engine = FindingsEngine()
-        
-        # Create heatmap with high importance in top-left (eye region)
-        heatmap = [[0.05] * 4 for _ in range(4)]
-        heatmap[0][0] = 0.9  # High importance in top-left
-        heatmap[1][0] = 0.9
-        
-        label, findings = engine.generate_findings(0.75, heatmap)
-        
-        # Should mention specific regions
-        findings_text = ' '.join(findings)
-        assert len(findings_text) > 0
-    
     def test_confidence_description(self):
         """Test confidence description generation."""
-        from app.core.findings_engine import FindingsEngine
+        from app.services.findings_engine import FindingsEngine
         
         engine = FindingsEngine()
         
@@ -174,74 +155,6 @@ class TestFindingsEngine:
         
         desc_fake = engine.get_confidence_description(0.9)
         assert "fake" in desc_fake.lower()
-
-
-# ============================================================
-# UNIT TESTS: SaliencyMapper
-# ============================================================
-
-class TestSaliencyMapper:
-    """Test saliency mapping logic (Decision 3)."""
-    
-    def test_saliency_mapper_import(self):
-        """Verify SaliencyMapper can be imported."""
-        try:
-            from app.core.saliency_mapper import SaliencyMapper
-            assert SaliencyMapper is not None
-        except ImportError:
-            pytest.skip("SaliencyMapper not yet implemented")
-    
-    def test_saliency_output_shape(self, dummy_classifier, sample_face_image):
-        """Test that saliency output is correct shape (14×14 for 224×224 input)."""
-        from app.core.saliency_mapper import SaliencyMapper
-        
-        mapper = SaliencyMapper(dummy_classifier, patch_size=16)
-        
-        # Output should be 14×14 for 224×224 input with 16×16 patches
-        heatmap = mapper.compute(sample_face_image)
-        
-        assert isinstance(heatmap, list)
-        assert len(heatmap) == 14, f"Expected 14 rows, got {len(heatmap)}"
-        assert len(heatmap[0]) == 14, f"Expected 14 cols, got {len(heatmap[0])}"
-    
-    def test_saliency_output_range(self, dummy_classifier, sample_face_image):
-        """Test that saliency values are in [0, 1]."""
-        from app.core.saliency_mapper import SaliencyMapper
-        
-        mapper = SaliencyMapper(dummy_classifier, patch_size=16)
-        heatmap = mapper.compute(sample_face_image)
-        
-        # Flatten and check all values
-        flat = [v for row in heatmap for v in row]
-        assert all(0.0 <= v <= 1.0 for v in flat), "Saliency values out of range"
-    
-    def test_saliency_json_serializable(self, dummy_classifier, sample_face_image):
-        """Test that saliency heatmap is JSON-serializable."""
-        from app.core.saliency_mapper import SaliencyMapper
-        import json
-        
-        mapper = SaliencyMapper(dummy_classifier, patch_size=16)
-        heatmap = mapper.compute(sample_face_image)
-        
-        # Should be able to JSON encode
-        json_str = json.dumps(heatmap)
-        assert json_str is not None
-        assert len(json_str) > 0
-    
-    def test_saliency_upsample(self, dummy_classifier, sample_face_image):
-        """Test upsampling heatmap to full resolution."""
-        from app.core.saliency_mapper import SaliencyMapper
-        
-        mapper = SaliencyMapper(dummy_classifier, patch_size=16)
-        heatmap_14x14 = mapper.compute(sample_face_image)
-        
-        # Upsample to 224×224
-        heatmap_224x224 = mapper.upsample_heatmap(heatmap_14x14, (224, 224))
-        
-        assert heatmap_224x224.shape == (224, 224)
-        assert heatmap_224x224.dtype == np.float32
-        assert heatmap_224x224.min() >= 0.0
-        assert heatmap_224x224.max() <= 1.0
 
 
 # ============================================================
@@ -345,26 +258,7 @@ class TestPerformance:
         # Should be very fast for dummy classifier
         assert avg_time_ms < 100
     
-    def test_saliency_speed(self, dummy_classifier, sample_face_image):
-        """Benchmark saliency mapping speed."""
-        import time
-        
-        try:
-            from app.core.saliency_mapper import SaliencyMapper
-            
-            mapper = SaliencyMapper(dummy_classifier, patch_size=24)  # Larger patch for speed
-            
-            start = time.time()
-            heatmap = mapper.compute(sample_face_image)
-            elapsed = time.time() - start
-            
-            print(f"\nSaliency mapping time: {elapsed:.2f}s")
-            
-            # Should be under 10 seconds even for full computation
-            assert elapsed < 10.0
-        except ImportError:
-            pytest.skip("SaliencyMapper not implemented")
-
+    
 
 # ============================================================
 # RESPONSE VALIDATION
@@ -381,7 +275,6 @@ class TestResponseFormats:
             'confidence': float,
             'label': str,
             'findings': list,
-            'heatmap_data': list,
             'execution_time_ms': int,
             'model_info': dict,
         }
@@ -392,7 +285,6 @@ class TestResponseFormats:
             'confidence': 0.87,
             'label': 'fake',
             'findings': ['Finding 1', 'Finding 2'],
-            'heatmap_data': [[0.1, 0.2], [0.3, 0.4]],
             'execution_time_ms': 145,
             'model_info': {
                 'face_model': 'MediaPipe v1',

@@ -1,4 +1,4 @@
-# backend/app/core/deepfake_classifier.py
+# backend/app/services/deepfake_classifier.py
 """
 Deepfake Classification using ONNX Runtime
 - Loads EfficientNet-B0 ONNX model

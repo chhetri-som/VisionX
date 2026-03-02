@@ -48,7 +48,7 @@ class TestAnalyzeImageAPI:
         assert data['label'] in ['real', 'fake']
         assert 'findings' in data
         assert isinstance(data['findings'], list)
-        assert 'heatmap_data' in data
+        # assert 'heatmap_data' in data  # Removed
         assert 'execution_time_ms' in data
         
         print(f"✅ Real face analysis:")
@@ -151,7 +151,7 @@ class TestAnalyzeImageAPI:
         if data['face_detected']:
             required_fields = [
                 'confidence', 'label', 'findings',
-                'heatmap_data', 'execution_time_ms', 'model_info'
+                'execution_time_ms', 'model_info'
             ]
             for field in required_fields:
                 assert field in data, f"Missing field: {field}"

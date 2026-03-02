@@ -5,8 +5,8 @@ Run: pytest tests/test_classifier.py -v
 import cv2
 import numpy as np
 from pathlib import Path
-from app.core.face_detector import FaceDetector
-from app.core.deepfake_classifier import DeepfakeClassifier
+from app.services.face_detector import FaceDetector
+from app.services.deepfake_classifier import DeepfakeClassifier
 from app.core.config import FACE_LANDMARKER_PATH, DEEPFAKE_MODEL_PATH
 
 class TestDeepfakeClassifier:
