@@ -16,9 +16,9 @@ from app.core.config import (
     FACE_LANDMARKER_PATH, DEEPFAKE_MODEL_PATH
 )
 from app.core.logging_config import setup_logging, get_logger
-from app.services.face_detector import FaceDetector
-from app.services.deepfake_classifier import DeepfakeClassifier, DummyClassifier
-from app.services.findings_engine import FindingsEngine
+from app.services.image.face_detector import FaceDetector
+from app.services.image.deepfake_classifier import DeepfakeClassifier, DummyClassifier
+from app.services.image.findings_engine import FindingsEngine
 from app.routes import health, image
 
 # Setup logging

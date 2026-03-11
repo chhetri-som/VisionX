@@ -23,20 +23,30 @@ class ForensicsService:
         """
         try:
             img = Image.open(io.BytesIO(image_bytes))
+            image_format = img.format
             exif_data = img.getexif()
 
             if not exif_data:
-                return {
-                    "severity": "anomalous",
-                    "score": 88,
-                    "summary": "No metadata found — strong AI/synthetic signal.",
-                    "detail": (
-                        "Authentic camera photos almost always contain EXIF metadata. "
-                        "Completely absent metadata strongly indicates AI generation, "
-                        "screenshot capture, or deliberate stripping before upload."
-                    ),
-                    "raw": {},
-                }
+                if image_format == 'PNG':
+                    return{
+                        "severity": "clean",
+                        "score": 0,  # ← Skip penalty for PNG
+                        "summary": "PNG format — EXIF not applicable.",
+                        "detail": "PNG files do not store camera metadata. Score N/A.",
+                        "raw": {},                        
+                    }
+                else:
+                    return {
+                        "severity": "anomalous",
+                        "score": 50,
+                        "summary": "No metadata found — strong AI/synthetic signal.",
+                        "detail": (
+                            "Authentic camera photos almost always contain EXIF metadata. "
+                            "Completely absent metadata strongly indicates AI generation, "
+                            "screenshot capture, or deliberate stripping before upload."
+                        ),
+                        "raw": {},
+                    }
 
             clean_exif = {}
             for tag_id, value in exif_data.items():
@@ -109,20 +119,29 @@ class ForensicsService:
             }
 
     @staticmethod
-    def regional_ela(
-        image_bytes: bytes,
-        bbox: dict = None,
-        quality: int = 90,
-    ) -> dict:
+    def regional_ela(image_bytes: bytes, bbox: dict = None, quality: int = 90, face_detector=None) -> dict:
         """
         Performs Error Level Analysis and compares the face region against
         background regions to detect compression inconsistencies.
 
         bbox: {"x1": float, "y1": float, "x2": float, "y2": float}
               All values are NORMALISED (0.0–1.0) relative to image dimensions.
+        
+        face_detector: Optional FaceDetector instance to mask secondary faces
+                      from background sampling. Prevents multi-face contamination.
         """
         try:
             original = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            image_format = Image.open(io.BytesIO(image_bytes)).format
+
+            if image_format == 'PNG':
+                return {
+                    "severity": "clean",
+                    "score": 0,
+                    "summary": "PNG format — ELA not applicable (lossless compression).",
+                    "detail": "Error Level Analysis requires JPEG compression artifacts. PNG is lossless and has no baseline patterns.",
+                    "visualization": None,            
+                }
             w, h = original.size
 
             # Re-save at known quality
@@ -152,15 +171,73 @@ class ForensicsService:
                 face_region = diff_array[y1:y2, x1:x2]
                 face_mean = float(np.mean(face_region)) if face_region.size > 0 else 0.0
 
-                # Background: sample four image corners
+                # ─── Multi-face masking: detect secondary faces and exclude from background ───
+                secondary_face_bboxes = []
+                if face_detector is not None:
+                    try:
+                        import cv2
+                        nparr = np.frombuffer(image_bytes, np.uint8)
+                        image_array = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                        if image_array is not None:
+                            detection = face_detector.detect(image_array)
+                            if detection.get("detected"):
+                                # Collect all secondary faces (skip first one which is primary)
+                                secondary_face_bboxes = detection["faces"][1:]
+                    except Exception:
+                        # If face detection fails, proceed without masking
+                        pass
+
+                # Helper: Check if a corner region overlaps with any secondary face
+                def corner_overlaps_face(corner_y1, corner_y2, corner_x1, corner_x2, secondary_bboxes):
+                    for face in secondary_bboxes:
+                        face_bbox = face.get("bbox", [])  # pixel coords [x_min, y_min, x_max, y_max]
+                        if len(face_bbox) >= 4:
+                            fx1, fy1, fx2, fy2 = face_bbox[0], face_bbox[1], face_bbox[2], face_bbox[3]
+                            # Check intersection
+                            if not (corner_x2 < fx1 or corner_x1 > fx2 or corner_y2 < fy1 or corner_y1 > fy2):
+                                return True
+                    return False
+
+                # Background: sample four image corners (pixel coords)
                 cs = min(80, w // 5, h // 5)
-                corners = [
-                    diff_array[:cs, :cs],
-                    diff_array[:cs, w - cs :],
-                    diff_array[h - cs :, :cs],
-                    diff_array[h - cs :, w - cs :],
+                corner_specs = [
+                    (0, cs, 0, cs),                  # top-left
+                    (0, cs, w - cs, w),              # top-right
+                    (h - cs, h, 0, cs),              # bottom-left
+                    (h - cs, h, w - cs, w),          # bottom-right
                 ]
-                bg_mean = float(np.mean(np.concatenate([c.flatten() for c in corners])))
+
+                safe_corners = []
+                for corner_y1, corner_y2, corner_x1, corner_x2 in corner_specs:
+                    if not corner_overlaps_face(corner_y1, corner_y2, corner_x1, corner_x2, secondary_face_bboxes):
+                        safe_corners.append(diff_array[corner_y1:corner_y2, corner_x1:corner_x2])
+
+                # If we found safe corners, use them; otherwise fall back to full-image analysis
+                if safe_corners:
+                    bg_mean = float(np.mean(np.concatenate([c.flatten() for c in safe_corners])))
+                else:
+                    # No safe corners found (all corners contain secondary faces)
+                    # Fall back to full image variance
+                    overall_std = float(np.std(diff_array))
+                    if overall_std > 40:
+                        severity = "suspicious"
+                        score = min(100, int(overall_std))
+                        summary = f"High variance in compression levels (σ={overall_std:.1f}) — possible composite image."
+                    else:
+                        severity = "clean"
+                        score = int(overall_std // 2)
+                        summary = f"Compression levels appear uniform across image (σ={overall_std:.1f})."
+                    detail = (
+                        "Face region detected, but all image corners contain other faces. "
+                        "Falling back to full-image variance analysis to avoid contamination."
+                    )
+                    return {
+                        "severity": severity,
+                        "score": score,
+                        "summary": summary,
+                        "detail": detail,
+                        "visualization": f"data:image/jpeg;base64,{ela_b64}",
+                    }
 
                 delta_pct = ((face_mean - bg_mean) / (bg_mean + 1e-6)) * 100
 

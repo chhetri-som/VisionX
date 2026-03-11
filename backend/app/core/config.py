@@ -27,16 +27,15 @@ DEEPFAKE_MODEL_PATH = os.getenv(
 )
 
 # --- CONFIDENCE THRESHOLDS ---
-# If confidence >= this, classify as "fake"
-CONFIDENCE_FAKE_THRESHOLD = 0.5
-
-# If confidence >= this, it's HIGH confidence in fake
-CONFIDENCE_HIGH_THRESHOLD = 0.7
+# if confidence < REAL_THRESHOLD -> real
+REAL_THRESHOLD = 0.3
+# confidence < UNCERTAIN_THRESHOLD -> uncertain
+UNCERTAIN_THRESHOLD = 0.6
+# if greater than 0.6 -> fake
 
 # --- API SETTINGS ---
 API_TITLE = "VisionX"
 API_VERSION = "1.0.0"
-API_DESCRIPTION = "Privacy-first static image deepfake detector"
 
 # Maximum image file size (in MB)
 MAX_IMAGE_SIZE_MB = 10
@@ -48,33 +47,10 @@ CORS_ORIGINS = [
     "http://127.0.0.1:5173",      # Loopback variant
 ]
 
-# When deploying to production, add your domain:
-# "https://visionx.example.com",
-# "https://app.example.com",
-
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_METHODS = ["GET", "POST", "OPTIONS"]
-CORS_ALLOW_HEADERS = ["Content-Type", "Authorization"]
-
-
-
 
 # --- LOGGING ---
 
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
-
-
-# --- DATABASE / STORAGE (Not used in v1, but good to have) ---
-
-# In v1, all processing is transient (no storage)
-# Images are deleted immediately after analysis
-STORE_IMAGES = False
-STORE_RESULTS = False
-
-# Face Detection
-MIN_FACE_SIZE = 50
-FACE_PADDING = 0.1
-
 
 # --- DEBUG MODE ---
 

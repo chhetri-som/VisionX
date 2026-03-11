@@ -10,12 +10,10 @@ Design intent:
 """
 import numpy as np
 from typing import List, Tuple, Dict, Optional
-
+from app.core.config import REAL_THRESHOLD, UNCERTAIN_THRESHOLD
 
 class FindingsEngine:
 
-    REAL_THRESHOLD      = 0.3
-    UNCERTAIN_THRESHOLD = 0.6
     EXPECTED_LANDMARKS  = 468
 
     def generate_findings(
@@ -49,9 +47,9 @@ class FindingsEngine:
     # ── Private ──────────────────────────────────────────────────────────────
 
     def _get_label(self, confidence: float) -> str:
-        if confidence < self.REAL_THRESHOLD:
+        if confidence < REAL_THRESHOLD:
             return "real"
-        if confidence < self.UNCERTAIN_THRESHOLD:
+        if confidence < UNCERTAIN_THRESHOLD:
             return "uncertain"
         return "fake"
 

@@ -11,8 +11,7 @@ logger = get_logger(__name__)
 
 router = APIRouter()
 
-# These will be imported from main.py after models are loaded
-# We'll set them as globals that get populated during startup
+# loaded from main.py at startup
 face_detector = None
 deepfake_classifier = None
 findings_engine = None

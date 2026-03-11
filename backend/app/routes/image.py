@@ -9,15 +9,16 @@ import numpy as np
 import time
 
 from app.schemas.responses import AnalyzeResponse, FaceResult, ForensicsResponse
-from app.services.forensics import ForensicsService
-from app.services.cfa_analysis import CFAAnalyzer
-from app.services.fft_analysis import FFTAnalyzer
+from app.services.image_forensics.forensics import ForensicsService
+from app.services.image_forensics.cfa_analysis import CFAAnalyzer
+from app.services.image_forensics.fft_analysis import FFTAnalyzer
 from app.core.logging_config import get_logger
 from app.core.config import MAX_IMAGE_SIZE_MB
 
 logger = get_logger(__name__)
 router = APIRouter()
 
+# loaded from main.py at startup
 face_detector       = None
 deepfake_classifier = None
 findings_engine     = None
@@ -171,6 +172,11 @@ async def analyze_forensics(
     Returns structured signals — not raw image blobs — so the frontend can
     present human-readable verdicts with optional expandable visualisations.
 
+    Pipeline behavior:
+    - Always runs EXIF metadata analysis
+    - If face detected: runs ELA, CFA, FFT
+    - If no face detected: skips image-dependent analyses (only metadata)
+
     Everything runs strictly in-memory; no files are written to disk.
     """
     logger.info(
@@ -187,63 +193,135 @@ async def analyze_forensics(
         file_size_mb = len(image_bytes) / (1024 * 1024)
         logger.info(f"Image size: {file_size_mb:.2f} MB")
 
-        bbox = None
-        if has_face:
-            bbox = {
-                "x1": face_x1,
-                "y1": face_y1,
-                "x2": face_x2,
-                "y2": face_y2,
-            }
-            logger.debug(f"Face bbox prepared for analysis: {bbox}")
+        # ── Step 1: Decode image for face detection ──────────────────────────────────
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image_array = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if image_array is None or image_array.size == 0:
+            raise HTTPException(status_code=400, detail="Failed to decode image.")
+
+        # ── Step 2: Auto-detect faces in image ────────────────────────────────────────
+        logger.info("Auto-detecting faces for forensics analysis...")
+        detection = face_detector.detect(image_array)
+        faces_detected = detection.get("detected", False)
+        face_count = detection.get("face_count", 0)
+
+        if faces_detected and face_count > 0:
+            logger.info(f"Face detection: {face_count} face(s) detected")
+            # Use the first (primary) face for forensics
+            primary_face = detection["faces"][0]
+            h, w = image_array.shape[:2]
+            
+            # Convert pixel bbox to normalized coordinates for ELA
+            bbox_pixel = primary_face.get("bbox", [0, 0, w, h])
+            if len(bbox_pixel) >= 4:
+                bbox = {
+                    "x1": bbox_pixel[0] / w,
+                    "y1": bbox_pixel[1] / h,
+                    "x2": bbox_pixel[2] / w,
+                    "y2": bbox_pixel[3] / h,
+                }
+            else:
+                bbox = None
+            run_full_pipeline = True
+        else:
+            logger.info("No face detected — skipping image-dependent forensic analyses")
+            bbox = None
+            run_full_pipeline = False
 
         logger.info("Starting forensic analysis pipeline...")
         
-        # Run all four forensic analyses
-        logger.debug("Running EXIF metadata analysis...")
+        # ── Always run EXIF metadata analysis ──────────────────────────────────────────
+        logger.info("Running EXIF metadata analysis...")
         exif_result = ForensicsService.score_exif(image_bytes)
         logger.info(f"EXIF analysis completed - score: {exif_result.get('score', 'N/A')}, severity: {exif_result.get('severity', 'N/A')}")
-        
-        logger.debug("Running Error Level Analysis (ELA)...")
-        ela_result = ForensicsService.regional_ela(image_bytes, bbox)
-        logger.info(f"ELA analysis completed - score: {ela_result.get('score', 'N/A')}, severity: {ela_result.get('severity', 'N/A')}")
-        
-        logger.debug("Running Color Filter Array (CFA) noise analysis...")
-        cfa_result = CFAAnalyzer.analyze(image_bytes)
-        logger.info(f"CFA analysis completed - score: {cfa_result.get('score', 'N/A')}, severity: {cfa_result.get('severity', 'N/A')}")
-        
-        logger.debug("Running Fast Fourier Transform (FFT) frequency analysis...")
-        fft_result = FFTAnalyzer.analyze(image_bytes)
-        logger.info(f"FFT analysis completed - score: {fft_result.get('score', 'N/A')}, severity: {fft_result.get('severity', 'N/A')}")
 
         signals = [
-            {"id": "metadata",  "label": "Metadata (EXIF)",           **exif_result},
-            {"id": "ela",       "label": "Compression Analysis (ELA)", **ela_result},
-            {"id": "noise",     "label": "Sensor Noise (CFA)",         **cfa_result},
-            {"id": "frequency", "label": "Frequency Spectrum (FFT)",   **fft_result},
+            {"id": "metadata", "label": "Metadata (EXIF)", **exif_result},
         ]
-        
-        logger.info(f"All forensic analyses completed. Total signals: {len(signals)}")
+
+        # ── Conditional: Run remaining analyses only if faces detected ─────────────────
+        if run_full_pipeline:
+            logger.info("Running Error Level Analysis (ELA)...")
+            ela_result = ForensicsService.regional_ela(image_bytes, bbox, quality=90, face_detector=face_detector)
+            logger.info(f"ELA analysis completed - score: {ela_result.get('score', 'N/A')}, severity: {ela_result.get('severity', 'N/A')}")
+            
+            logger.info("Running Color Filter Array (CFA) noise analysis...")
+            # use per-face FCA analysis when bbox is available
+            if has_face and bbox:
+                cfa_result = CFAAnalyzer.analyze_face_region(image_bytes, bbox)
+                logger.info(f"CFA analysis (face region) completed - score: {cfa_result.get('score', 'N/A')}, severity: {cfa_result.get('severity', 'N/A')}")
+            else:
+                # fallback to whole image analysis is no face detected
+                cfa_result = CFAAnalyzer.analyze(image_bytes)
+                logger.info(f"CFA analysis (full image) completed - score: {cfa_result.get('score', 'N/A')}, severity: {cfa_result.get('severity', 'N/A')}")
+            
+            logger.info("Running Fast Fourier Transform (FFT) frequency analysis...")
+            fft_result = FFTAnalyzer.analyze(image_bytes, bbox=bbox if has_face else None)
+            logger.info(f"FFT analysis completed - score: {fft_result.get('score', 'N/A')}, severity: {fft_result.get('severity', 'N/A')}")
+
+            signals.extend([
+                {"id": "ela",       "label": "Compression Analysis (ELA)", **ela_result},
+                {"id": "noise",     "label": "Sensor Noise (CFA)",         **cfa_result},
+                {"id": "frequency", "label": "Frequency Spectrum (FFT)",   **fft_result},
+            ])
+        else:
+            logger.info("Skipping ELA, CFA, FFT — no face detected to anchor analysis")
+
+        logger.info(f"Forensic analyses completed. Total signals: {len(signals)}")
 
         # --- Aggregate verdict ---
         flagged   = [s for s in signals if s["severity"] != "clean"]
         anomalous = [s for s in signals if s["severity"] == "anomalous"]
-        composite_score = round(sum(s["score"] for s in signals) / len(signals), 1)
+
+        # Adjust weighting based on available signals
+        exif_signal = next((s for s in signals if s["id"] == "metadata"), None)
+        exif_missing = exif_signal and exif_signal.get("raw") == {}
+        
+        # Calculate weighted composite score
+        if run_full_pipeline:
+            # Full pipeline: all 4 signals
+            if exif_missing:
+                weights = {"metadata": 0.1, "ela": 0.3, "noise": 0.3, "frequency": 0.3}
+            else:
+                weights = {"metadata": 0.25, "ela": 0.25, "noise": 0.25, "frequency": 0.25}
+        else:
+            # Metadata-only: single signal, weight = 1.0
+            weights = {"metadata": 1.0}
+        
+        composite_score = round(sum(s["score"] * weights.get(s["id"], 0) for s in signals), 1)
         
         logger.info(f"Verdict calculation - flagged signals: {len(flagged)}, anomalous signals: {len(anomalous)}, composite_score: {composite_score}")
 
-        if len(anomalous) >= 2 or composite_score >= 68:
-            verdict_label = "LIKELY AI / DEEPFAKE"
-            verdict_confidence = "high"
-            verdict_color = "red"
-        elif len(flagged) >= 2 or composite_score >= 38:
-            verdict_label = "SUSPICIOUS — REVIEW CAREFULLY"
-            verdict_confidence = "medium"
-            verdict_color = "amber"
+        # --- Verdict logic ---
+        if not run_full_pipeline:
+            # For metadata-only, be more conservative
+            if composite_score >= 70:
+                verdict_label = "LIKELY AI / DEEPFAKE"
+                verdict_confidence = "high"
+                verdict_color = "red"
+            elif composite_score >= 40:
+                verdict_label = "SUSPICIOUS — REVIEW CAREFULLY"
+                verdict_confidence = "medium"
+                verdict_color = "amber"
+            else:
+                verdict_label = "LIKELY AUTHENTIC"
+                verdict_confidence = "high" if composite_score < 20 else "medium"
+                verdict_color = "green"
         else:
-            verdict_label = "LIKELY AUTHENTIC"
-            verdict_confidence = "high" if len(flagged) == 0 else "medium"
-            verdict_color = "green"
+            # Full pipeline verdict
+            if len(anomalous) >= 2 or composite_score >= 68:
+                verdict_label = "LIKELY AI / DEEPFAKE"
+                verdict_confidence = "high"
+                verdict_color = "red"
+            elif len(flagged) >= 2 or composite_score >= 38:
+                verdict_label = "SUSPICIOUS — REVIEW CAREFULLY"
+                verdict_confidence = "medium"
+                verdict_color = "amber"
+            else:
+                verdict_label = "LIKELY AUTHENTIC"
+                verdict_confidence = "high" if len(flagged) == 0 else "medium"
+                verdict_color = "green"
         
         logger.info(f"Final verdict: {verdict_label} (confidence: {verdict_confidence}, color: {verdict_color})")
 

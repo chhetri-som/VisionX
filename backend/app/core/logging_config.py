@@ -13,7 +13,6 @@ import logging
 import logging.handlers
 import os
 from pathlib import Path
-from datetime import datetime
 
 
 def setup_logging(log_level: str = "INFO") -> None:
@@ -25,7 +24,7 @@ def setup_logging(log_level: str = "INFO") -> None:
     """
     
     # Create logs directory in project root
-    project_root = Path(__file__).parent.parent.parent.parent  # Go up 4 levels from core/
+    project_root = Path(__file__).parent.parent.parent.parent  # root directory
     logs_dir = project_root / "logs"
     logs_dir.mkdir(exist_ok=True)
     
@@ -69,6 +68,7 @@ def setup_logging(log_level: str = "INFO") -> None:
     root_logger.addHandler(file_handler)
     
     # Log startup message
+    log_system_info()
     logger = logging.getLogger(__name__)
     logger.info("=" * 60)
     logger.info("🚀 VisionX Logging System Initialized")

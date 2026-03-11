@@ -16,7 +16,7 @@ class FFTAnalyzer:
     FFT_SIZE = 512
 
     @staticmethod
-    def analyze(image_bytes: bytes) -> dict:
+    def analyze(image_bytes: bytes, bbox: dict = None) -> dict:
         try:
             nparr = np.frombuffer(image_bytes, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
@@ -24,11 +24,49 @@ class FFTAnalyzer:
             if img is None:
                 return FFTAnalyzer._error("Could not decode image for frequency analysis.")
 
+            img_h, img_w = img.shape
             N = FFTAnalyzer.FFT_SIZE
-            img_resized = cv2.resize(img, (N, N)).astype(float)
+
+            # --- 1. Bounding Box Extraction & Windowing ---
+            if bbox:
+                # Convert normalized dict to absolute pixels
+                x1 = int(bbox.get("x1", 0.0) * img_w)
+                y1 = int(bbox.get("y1", 0.0) * img_h)
+                x2 = int(bbox.get("x2", 1.0) * img_w)
+                y2 = int(bbox.get("y2", 1.0) * img_h)
+                
+                cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+            else:
+                # Fallback: Use the center of the image if no face is detected
+                cx, cy = img_w // 2, img_h // 2
+
+            # Bounded crop coordinates
+            half_N = N // 2
+            start_y, end_y = max(0, cy - half_N), min(img_h, cy + half_N)
+            start_x, end_x = max(0, cx - half_N), min(img_w, cx + half_N)
+            
+            img_cropped = img[start_y:end_y, start_x:end_x].astype(float)
+            crop_h, crop_w = img_cropped.shape
+            
+            # Create a 512x512 pure black canvas
+            img_ready = np.zeros((N, N), dtype=float)
+            
+            if crop_h > 0 and crop_w > 0:
+                # Apply a 2D Hann window to the crop to fade edges smoothly to black.
+                # This completely prevents FFT wrap-around artifacts (the bright frequency cross).
+                hann_y = np.hanning(crop_h)
+                hann_x = np.hanning(crop_w)
+                hann_2d = np.outer(hann_y, hann_x)
+                
+                img_windowed = img_cropped * hann_2d
+                
+                # Center the smoothly faded face on the black canvas
+                y_offset = (N - crop_h) // 2
+                x_offset = (N - crop_w) // 2
+                img_ready[y_offset:y_offset+crop_h, x_offset:x_offset+crop_w] = img_windowed
 
             # 2D FFT — shifted so DC is at centre
-            fshift = np.fft.fftshift(np.fft.fft2(img_resized))
+            fshift = np.fft.fftshift(np.fft.fft2(img_ready))
             magnitude = np.abs(fshift)
 
             # --- Visualisation: log-magnitude with INFERNO colormap ---
@@ -46,17 +84,18 @@ class FFTAnalyzer:
             mag_norm = mag_no_dc / (mag_no_dc.max() + 1e-6)
 
             # --- Peak detection ---
-            peak_threshold = 0.12
+            peak_threshold = 0.15
             peak_mask = mag_norm > peak_threshold
             peak_count = int(np.sum(peak_mask))
 
-            # --- Symmetry test (GAN artefacts appear in symmetric pairs) ---
-            top = mag_norm[:center, :]
-            bot = np.flipud(mag_norm[center:, :])
-            min_h = min(top.shape[0], bot.shape[0])
-            corr_matrix = np.corrcoef(top[:min_h].flatten(), bot[:min_h].flatten())
-            symmetry_score = float(corr_matrix[0, 1]) if corr_matrix.shape == (2, 2) else 0.0
-
+            #Peak Symmetry: Only check symmetry of the anomalous high-frequency peaks
+            top_peaks = peak_mask[:center, :]
+            bot_peaks = np.flipud(peak_mask[center+(N%2):, :]) # Handle odd/even splits
+            
+            intersection = np.logical_and(top_peaks, bot_peaks).sum()
+            union = np.logical_or(top_peaks, bot_peaks).sum()
+            symmetry_score = float(intersection / union) if union > 0 else 0.0
+            
             # --- Grid periodicity test ---
             # Strong periodic grid → regular peaks along horizontal/vertical axes
             h_profile = mag_norm[center, :]  # horizontal slice through centre
@@ -94,34 +133,49 @@ class FFTAnalyzer:
             if peak_count > 600:
                 score += 55
                 flags.append(f"Very high spectral peak count ({peak_count}) — strong GAN/upsampling artefact pattern.")
-            elif peak_count > 200:
+            elif peak_count > 300:
                 score += 28
                 flags.append(f"Elevated spectral peaks ({peak_count}) — possible synthetic generation.")
             else:
                 flags.append(f"Low spectral peak count ({peak_count}) — within natural range.")
 
-            if symmetry_score > 0.88:
+            if symmetry_score > 0.60:
                 score += 30
                 flags.append(f"High spectral symmetry ({symmetry_score:.2f}) — consistent with synthetic generation.")
-            elif symmetry_score > 0.75:
+            elif symmetry_score > 0.35:
                 score += 12
                 flags.append(f"Moderate spectral symmetry ({symmetry_score:.2f}).")
 
-            if axis_peaks > 20:
+            if axis_peaks > 35:
                 score += 20
                 flags.append(f"Axis-aligned periodic peaks ({axis_peaks}) — suggests convolution grid artefacts.")
 
             score = min(score, 100)
 
-            if score >= 65:
+            if score >= 70:
                 severity = "anomalous"
                 summary = flags[0]
-            elif score >= 30:
+            elif score >= 45:
                 severity = "suspicious"
                 summary = flags[0]
             else:
                 severity = "clean"
                 summary = f"Frequency spectrum appears natural (peaks: {peak_count}, symmetry: {symmetry_score:.2f})."
+
+            # --- DIAGNOSTIC LOGGING ---
+            print(f"\n{'='*60}")
+            print(f"FFT DIAGNOSTIC:")
+            print(f"  peak_count: {peak_count}")
+            print(f"  symmetry_score: {symmetry_score:.4f}")
+            print(f"  axis_peaks: {axis_peaks}")
+            print(f"  Score breakdown:")
+            print(f"    peak contribution: +{55 if peak_count > 800 else (28 if peak_count > 400 else 0)}")
+            print(f"    symmetry contribution: +{30 if symmetry_score > 0.92 else (12 if symmetry_score > 0.85 else 0)}")
+            print(f"    axis_peaks contribution: +{20 if axis_peaks > 35 else 0}")
+            print(f"    raw_score: {score}")
+            print(f"    final_score: {score}")
+            print(f"    severity: {severity}")
+            print(f"{'='*60}\n")
 
             return {
                 "severity": severity,

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-// ─── Severity config — mapped to the earthy/olive theme from index.css ───────
+// ─── Severity config — mapped to the earthy/olive theme ────────────────────
 const SEV = {
   clean: {
     icon: '✓',
@@ -34,30 +34,226 @@ const VERDICT_CFG = {
     border: 'rgba(92, 138, 60, 0.3)',
     color: 'var(--green)',
     dimColor: 'var(--accent-green-dim)',
+    pulseClass: 'animate-verdict-pulse',
   },
   amber: {
     bg: 'rgba(184, 134, 11, 0.07)',
     border: 'rgba(184, 134, 11, 0.3)',
     color: 'var(--amber)',
     dimColor: '#8a6300',
+    pulseClass: 'animate-verdict-pulse amber',
   },
   red: {
     bg: 'var(--red-ghost)',
     border: 'rgba(184, 76, 58, 0.3)',
     color: 'var(--red)',
     dimColor: 'var(--accent-red-dim)',
+    pulseClass: 'animate-verdict-pulse red',
   },
 };
 
-// ─── Descriptions shown to user per signal type ───────────────────────────────
 const SIGNAL_DESC = {
   metadata: 'Real cameras embed invisible metadata (make, model, lens, timestamp). AI generators usually strip this entirely or leave a software signature.',
-  ela: 'Re-compresses the image and amplifies differences. Spliced faces compress differently from the original background — bright patches in the face region indicate manipulation.',
-  noise: 'Every camera sensor has a unique, uniform noise fingerprint. AI-generated regions or spliced content disrupt this pattern — highlighted cells mark statistical outliers.',
-  frequency: 'AI generators (GANs, diffusion models) leave periodic grid artefacts in frequency space due to their upsampling layers. Real photos have smooth frequency distributions.',
+  ela: 'Re-compresses the image and amplifies differences. Spliced faces compress differently from the original background — bright patches indicate manipulation.',
+  noise: 'Every camera sensor has a unique, uniform noise fingerprint. AI-generated regions disrupt this pattern — highlighted cells mark statistical outliers.',
+  frequency: 'AI generators (GANs, diffusion models) leave periodic grid artefacts in frequency space due to upsampling layers. Real photos have smooth distributions.',
 };
 
-// ─── Single signal row with expand/collapse ───────────────────────────────────
+// ─── Animated score counter ─────────────────────────────────────────────────
+const AnimatedScore = ({ targetScore, color, delay = 0 }) => {
+  const [displayScore, setDisplayScore] = useState(0);
+
+  useEffect(() => {
+    let animationFrameId;
+    let startTime;
+
+    const animate = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const duration = 1200; // 1.2s animation
+
+      if (elapsed < duration) {
+        const progress = elapsed / duration;
+        // Easing function: cubic-out for natural deceleration
+        const easeProgress = 1 - Math.pow(1 - progress, 3);
+        const newScore = Math.round(easeProgress * targetScore);
+        setDisplayScore(newScore);
+        animationFrameId = requestAnimationFrame(animate);
+      } else {
+        setDisplayScore(targetScore);
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      animationFrameId = requestAnimationFrame(animate);
+    }, delay);
+
+    return () => {
+      clearTimeout(timeoutId);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [targetScore, delay]);
+
+  return (
+    <div
+      style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 42,
+        fontWeight: 700,
+        color: color,
+        lineHeight: 1,
+        letterSpacing: '-0.02em',
+      }}
+      className="animate-score-counter"
+    >
+      {displayScore}
+    </div>
+  );
+};
+
+// ─── Risk scale visualization ───────────────────────────────────────────────
+const RiskScale = ({ score, color }) => {
+  const percentage = Math.max(0, Math.min(100, score));
+  
+  // Calculate position along scale: 0 = left, 100 = right
+  const position = percentage;
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        padding: '12px 0',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginBottom: 8,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 8,
+          color: 'var(--text-dim)',
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+        }}
+      >
+        <span>Authentic</span>
+        <span>Ambiguous</span>
+        <span>AI / Deepfake</span>
+      </div>
+
+      {/* Risk scale bar */}
+      <div
+        style={{
+          height: 6,
+          background: 'linear-gradient(90deg, #5C8A3C 0%, #AEB784 50%, #B84C3A 100%)',
+          borderRadius: 3,
+          overflow: 'hidden',
+          position: 'relative',
+          boxShadow: '0 2px 4px rgba(65, 67, 27, 0.1)',
+        }}
+      >
+        {/* Indicator dot */}
+        <div
+          style={{
+            position: 'absolute',
+            top: -3,
+            left: `${position}%`,
+            width: 12,
+            height: 12,
+            borderRadius: '50%',
+            background: color,
+            border: '2px solid #F8F3E1',
+            boxShadow: `0 2px 8px ${color}66`,
+            transform: 'translateX(-50%)',
+            transition: 'left 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          }}
+          className="animate-risk-indicator"
+        />
+      </div>
+
+      {/* Score label */}
+      <div
+        style={{
+          marginTop: 8,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          color: 'var(--text-secondary)',
+          letterSpacing: '0.05em',
+        }}
+      >
+        Score: <strong style={{ color }}>{score}</strong> / 100
+      </div>
+    </div>
+  );
+};
+
+// ─── Confidence visualizer ─────────────────────────────────────────────────
+const ConfidenceIndicator = ({ confidence, color }) => {
+  const isHigh = confidence === 'high';
+  const width = isHigh ? 85 : 55;
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 12,
+        padding: '8px 10px',
+        background: 'rgba(248, 243, 225, 0.5)',
+        borderRadius: 4,
+        border: '1px solid var(--border-light)',
+      }}
+    >
+      <span
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 8,
+          color: 'var(--text-tertiary)',
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          minWidth: 55,
+        }}
+      >
+        Confidence
+      </span>
+      <div
+        style={{
+          flex: 1,
+          height: 4,
+          background: 'var(--bg-tertiary)',
+          borderRadius: 2,
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            width: `${width}%`,
+            background: color,
+            borderRadius: 2,
+            transition: 'width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          }}
+        />
+      </div>
+      <span
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 9,
+          fontWeight: 600,
+          color: color,
+          textTransform: 'capitalize',
+          minWidth: 45,
+        }}
+      >
+        {confidence}
+      </span>
+    </div>
+  );
+};
+
+// ─── Single signal row with expand/collapse ──────────────────────────────────
 const SignalRow = ({ signal, index }) => {
   const [expanded, setExpanded] = useState(false);
   const cfg = SEV[signal.severity] || SEV.suspicious;
@@ -70,7 +266,17 @@ const SignalRow = ({ signal, index }) => {
         border: `1px solid ${cfg.border}`,
         background: cfg.bg,
         overflow: 'hidden',
-        animation: `fadeIn 0.35s ${index * 0.07}s ease-out both`,
+        animation: `signal-cascade 0.5s ease-out ${index * 0.08}s both`,
+        transition: 'all 0.3s ease',
+        cursor: canExpand ? 'pointer' : 'default',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = cfg.color;
+        e.currentTarget.style.background = `${cfg.bg}dd`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = cfg.border;
+        e.currentTarget.style.background = cfg.bg;
       }}
     >
       {/* ── Header row ── */}
@@ -278,7 +484,7 @@ const SignalRow = ({ signal, index }) => {
             </div>
           )}
 
-          {/* Raw EXIF data for metadata signal */}
+          {/* Raw EXIF data */}
           {signal.id === 'metadata' && signal.raw && Object.keys(signal.raw).length > 0 && (
             <div>
               <div
@@ -338,13 +544,112 @@ const SignalRow = ({ signal, index }) => {
   );
 };
 
-// ─── Main panel ───────────────────────────────────────────────────────────────
+// ─── Enhanced loading screen ────────────────────────────────────────────────
+const EnhancedLoadingState = () => {
+  const analyses = ['Metadata', 'Compression', 'Sensor Noise', 'Frequency'];
+
+  return (
+    <div style={{ padding: '40px 14px' }}>
+      {/* Floating icons */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: 20,
+          marginBottom: 24,
+        }}
+      >
+        {analyses.map((label, i) => (
+          <div
+            key={label}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 8,
+                background: `rgba(107, 127, 58, ${0.05 + i * 0.03})`,
+                border: '1px solid rgba(174, 183, 132, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 16,
+                animation: `float-gentle 2s ${i * 0.15}s ease-in-out infinite`,
+              }}
+            >
+              {['📊', '🔍', '🎯', '〰️'][i]}
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9,
+                color: 'var(--text-tertiary)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                animation: `pulse-subtle 1.6s ${i * 0.22}s ease-in-out infinite`,
+              }}
+            >
+              {label}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Status message */}
+      <div
+        style={{
+          textAlign: 'center',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          color: 'var(--cyan)',
+          letterSpacing: '0.1em',
+          animation: 'pulse-subtle 1.2s ease-in-out infinite',
+        }}
+      >
+        Scanning image signals...
+      </div>
+
+      {/* Progress bar */}
+      <div
+        style={{
+          marginTop: 16,
+          height: 2,
+          background: 'var(--bg-tertiary)',
+          borderRadius: 1,
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            background: 'linear-gradient(90deg, var(--cyan) 0%, var(--accent-blue) 100%)',
+            animation: 'loading-shimmer 2s infinite',
+            backgroundSize: '1000px 100%',
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
+// ─── Main panel ──────────────────────────────────────────────────────────────
 const ForensicsPanel = ({ selectedFile, analysisResult }) => {
   const [forensicData, setForensicData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const runForensics = async () => {
+    // DEBUG
+    console.log('analysisResult:', analysisResult);
+    console.log('faces:', analysisResult?.faces);
+    console.log('bbox:', analysisResult?.faces?.[0]?.bbox);
     if (!selectedFile) return;
     setLoading(true);
     setError(null);
@@ -353,10 +658,6 @@ const ForensicsPanel = ({ selectedFile, analysisResult }) => {
     const formData = new FormData();
     formData.append('file', selectedFile);
 
-    // Pass face bounding box from the ML model result if available.
-    // IMPORTANT: Your ML model bbox must be normalised to 0–1 before sending.
-    // If your model returns pixel coordinates, divide x values by image width
-    // and y values by image height first (see note in image_route_addition.py).
     const faces = analysisResult?.faces;
     if (faces && faces.length > 0 && faces[0].bbox) {
       const bbox = faces[0].bbox;
@@ -364,7 +665,6 @@ const ForensicsPanel = ({ selectedFile, analysisResult }) => {
         ? { x1: bbox[0], y1: bbox[1], x2: bbox[2], y2: bbox[3] }
         : bbox;
 
-      // Get image dimensions for normalisation
       const img = new Image();
       const { width: imageWidth, height: imageHeight } = await new Promise((resolve) => {
         img.onload = () => resolve({ width: img.width, height: img.height });
@@ -372,7 +672,6 @@ const ForensicsPanel = ({ selectedFile, analysisResult }) => {
       });
       URL.revokeObjectURL(img.src);
 
-      // Normalise pixel coordinates to 0-1 range
       const normX1 = (b.x1 ?? 0) / imageWidth;
       const normY1 = (b.y1 ?? 0) / imageHeight;
       const normX2 = (b.x2 ?? imageWidth) / imageWidth;
@@ -388,7 +687,7 @@ const ForensicsPanel = ({ selectedFile, analysisResult }) => {
     }
 
     try {
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+      const API_BASE = 'http://127.0.0.1:8000';
       const res = await fetch(`${API_BASE}/image/forensics`, {
         method: 'POST',
         body: formData,
@@ -480,7 +779,7 @@ const ForensicsPanel = ({ selectedFile, analysisResult }) => {
       {/* ── Body ── */}
       <div style={{ padding: '14px 16px' }}>
 
-        {/* Idle */}
+        {/* Idle state */}
         {!loading && !forensicData && !error && (
           <div
             style={{
@@ -501,48 +800,10 @@ const ForensicsPanel = ({ selectedFile, analysisResult }) => {
           </div>
         )}
 
-        {/* Loading */}
-        {loading && (
-          <div style={{ padding: '20px 0', textAlign: 'center' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                gap: 20,
-                marginBottom: 14,
-              }}
-            >
-              {['Metadata', 'Compression', 'Noise', 'Frequency'].map((lbl, i) => (
-                <div
-                  key={lbl}
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 9,
-                    color: 'var(--text-tertiary)',
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    animation: `pulse-subtle 1.6s ${i * 0.22}s ease-in-out infinite`,
-                  }}
-                >
-                  {lbl}
-                </div>
-              ))}
-            </div>
-            <div
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                color: 'var(--cyan)',
-                letterSpacing: '0.1em',
-                animation: 'pulse-subtle 1.2s ease-in-out infinite',
-              }}
-            >
-              Analysing signals...
-            </div>
-          </div>
-        )}
+        {/* Loading state */}
+        {loading && <EnhancedLoadingState />}
 
-        {/* Error */}
+        {/* Error state */}
         {error && (
           <div
             style={{
@@ -559,11 +820,11 @@ const ForensicsPanel = ({ selectedFile, analysisResult }) => {
           </div>
         )}
 
-        {/* Results */}
+        {/* Results section */}
         {forensicData && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-            {/* Signal rows */}
+            {/* Signal rows — cascading animation */}
             {forensicData.signals?.map((signal, i) => (
               <SignalRow key={signal.id} signal={signal} index={i} />
             ))}
@@ -573,24 +834,26 @@ const ForensicsPanel = ({ selectedFile, analysisResult }) => {
               style={{
                 height: 1,
                 background: 'var(--border-light)',
-                margin: '6px 0',
+                margin: '8px 0',
               }}
             />
 
-            {/* Verdict block */}
+            {/* Enhanced verdict block — HERO SECTION */}
             {verdict && (
               <div
                 style={{
-                  borderRadius: 6,
-                  border: `1.5px solid ${vcfg.border}`,
+                  borderRadius: 8,
+                  border: `2px solid ${vcfg.border}`,
                   background: vcfg.bg,
-                  padding: '14px 16px',
+                  padding: '20px 18px',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  animation: 'fadeIn 0.4s 0.3s ease-out both',
+                  flexDirection: 'column',
+                  gap: 14,
+                  animation: `fadeIn 0.6s 0.35s ease-out both`,
                 }}
+                className={vcfg.pulseClass}
               >
+                {/* Header */}
                 <div>
                   <div
                     style={{
@@ -599,7 +862,7 @@ const ForensicsPanel = ({ selectedFile, analysisResult }) => {
                       color: 'var(--text-tertiary)',
                       letterSpacing: '0.12em',
                       textTransform: 'uppercase',
-                      marginBottom: 5,
+                      marginBottom: 6,
                     }}
                   >
                     Forensic Verdict
@@ -607,16 +870,65 @@ const ForensicsPanel = ({ selectedFile, analysisResult }) => {
                   <div
                     style={{
                       fontFamily: 'var(--font-display)',
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: 700,
                       color: vcfg.color,
-                      letterSpacing: '0.01em',
-                      marginBottom: 5,
+                      letterSpacing: '-0.01em',
+                      lineHeight: 1.3,
                     }}
                   >
                     {verdict.label}
                   </div>
-                  {/* Signal pills */}
+                </div>
+
+                {/* Composite score with animation */}
+                <div>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 9,
+                      color: 'var(--text-tertiary)',
+                      letterSpacing: '0.12em',
+                      textTransform: 'uppercase',
+                      marginBottom: 8,
+                    }}
+                  >
+                    Risk Score
+                  </div>
+                  <AnimatedScore
+                    targetScore={verdict.composite_score}
+                    color={vcfg.color}
+                    delay={100}
+                  />
+                </div>
+
+                {/* Risk scale visualization */}
+                <RiskScale score={verdict.composite_score} color={vcfg.color} />
+
+                {/* Confidence indicator */}
+                <ConfidenceIndicator confidence={verdict.confidence} color={vcfg.color} />
+
+                {/* Signal summary */}
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    background: 'rgba(248, 243, 225, 0.7)',
+                    borderRadius: 4,
+                    border: '1px solid var(--border-light)',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 9,
+                      color: 'var(--text-tertiary)',
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      marginBottom: 6,
+                    }}
+                  >
+                    Signals
+                  </div>
                   <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                     {forensicData.signals?.map(s => {
                       const sc = SEV[s.severity] || SEV.suspicious;
@@ -641,41 +953,28 @@ const ForensicsPanel = ({ selectedFile, analysisResult }) => {
                   </div>
                 </div>
 
-                {/* Composite score */}
-                <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-                  <div
+                {/* Flagged count */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingTop: 6,
+                    borderTop: `1px solid ${vcfg.border}`,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10,
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  <span>Signals Flagged</span>
+                  <span
                     style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 32,
-                      fontWeight: 700,
+                      fontWeight: 600,
                       color: vcfg.color,
-                      lineHeight: 1,
-                      marginBottom: 3,
                     }}
                   >
-                    {verdict.composite_score}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 8,
-                      color: 'var(--text-dim)',
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    Risk Score
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 9,
-                      color: 'var(--text-tertiary)',
-                      marginTop: 3,
-                    }}
-                  >
-                    {verdict.signals_flagged}/{verdict.signals_total} flagged
-                  </div>
+                    {verdict.signals_flagged} / {verdict.signals_total}
+                  </span>
                 </div>
               </div>
             )}
