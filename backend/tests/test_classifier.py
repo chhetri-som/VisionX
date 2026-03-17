@@ -5,9 +5,9 @@ Run: pytest tests/test_classifier.py -v
 import cv2
 import numpy as np
 from pathlib import Path
-from app.services.face_detector import FaceDetector
-from app.services.deepfake_classifier import DeepfakeClassifier
-from app.core.config import FACE_LANDMARKER_PATH, DEEPFAKE_MODEL_PATH
+from app.services.image.face_detector import FaceDetector
+from app.services.image.image_classifier import ImageClassifier
+from app.core.config import FACE_LANDMARKER_PATH, IMAGE_MODEL_PATH
 
 class TestDeepfakeClassifier:
     """Test suite for classification."""
@@ -16,7 +16,7 @@ class TestDeepfakeClassifier:
     def setup_class(cls):
         """Load models once."""
         cls.detector = FaceDetector(FACE_LANDMARKER_PATH)
-        cls.classifier = DeepfakeClassifier(DEEPFAKE_MODEL_PATH)
+        cls.classifier = ImageClassifier(IMAGE_MODEL_PATH)
         cls.test_image_dir = Path('tests/test_images')
     
     def test_classify_real_face(self):

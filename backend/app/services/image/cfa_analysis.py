@@ -18,16 +18,6 @@ class CFAAnalyzer:
 
     @staticmethod
     def analyze_face_region(image_bytes: bytes, bbox: dict) -> dict:
-        """
-        Analyze noise patterns within a specific face region.
-        
-        Args:
-            image_bytes: Raw image data
-            bbox: {"x1": float, "y1": float, "x2": float, "y2": float} in NORMALIZED 0.0-1.0
-        
-        Returns:
-            Same dict structure as analyze() but focused on face region
-        """
         try:
             nparr = np.frombuffer(image_bytes, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)

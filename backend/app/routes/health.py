@@ -1,8 +1,6 @@
 # backend/app/routes/health.py
-"""
-Health check endpoint for VisionX API
-"""
 
+from sys import api_version
 from fastapi import APIRouter
 from app.schemas.responses import HealthResponse
 from app.core.logging_config import get_logger
@@ -13,57 +11,64 @@ router = APIRouter()
 
 # loaded from main.py at startup
 face_detector = None
-deepfake_classifier = None
+image_classifier = None
 findings_engine = None
+audio_preprocessor = None
+audio_classifier = None
 
 
-def set_model_instances(fd, dfc, fe):
+def set_model_instances(fd, ic, fe, ap, ac):
     """Set global model instances from main.py startup"""
-    global face_detector, deepfake_classifier, findings_engine
+    global face_detector, image_classifier, findings_engine, audio_preprocessor, audio_classifier
     face_detector = fd
-    deepfake_classifier = dfc
+    image_classifier = ic
     findings_engine = fe
+    audio_preprocessor = ap
+    audio_classifier = ac
 
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
-    """
-    Health check endpoint.
-    
-    Returns:
-    - status: 'ok' if all models loaded, 'error' otherwise
-    - models_loaded: boolean
-    - model names and version
-    
-    Useful for frontend to verify backend is ready before allowing uploads.
-    """
     logger.info("/health called")
 
-    models_ready = (
+    image_models_ready = (
         face_detector is not None
-        and deepfake_classifier is not None
+        and image_classifier is not None
         and findings_engine is not None
     )
 
-    if models_ready:
+    audio_models_ready = (
+        audio_preprocessor is not None
+        and audio_classifier is not None
+    )
+
+    all_models_ready = image_models_ready and audio_models_ready
+
+    if all_models_ready:
         logger.info("/health ok: all models loaded")
     else:
         missing_models = []
         if face_detector is None:
             missing_models.append("face_detector")
-        if deepfake_classifier is None:
-            missing_models.append("deepfake_classifier")
+        if image_classifier is None:
+            missing_models.append("image_classifier")
         if findings_engine is None:
             missing_models.append("findings_engine")
+        if audio_preprocessor is None:
+            missing_models.append("audio_preprocessor")
+        if audio_classifier is None:
+            missing_models.append("audio_classifier")
+        
         logger.warning(f"/health error: missing models={missing_models}")
     
     from app.core.config import API_VERSION
     
     return HealthResponse(
-        status="ok" if models_ready else "error",
-        models_loaded=models_ready,
+        status="ok" if all_models_ready else "error",
+        models_loaded=all_models_ready,
         face_model="MediaPipe Face Landmarker v1",
-        deepfake_model="EfficientNet-B0 INT8",
+        image_model="EfficientNet-B0 INT8",
+        audio_model="Audio CNN INT8" if audio_models_ready else "Not loaded",
         execution_provider="CPU",
         version=API_VERSION,
     )

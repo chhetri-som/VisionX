@@ -197,6 +197,25 @@ export const ImageMode = () => {
       {/* ── Right: Sidebar ── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
+        {/* Confidence gauge */}
+        <div className="panel" style={{ padding: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+          <span className="section-label">CLASSIFIER SCORE</span>
+          <ConfidenceGauge value={analyzed && face ? Math.round((Number(face.confidence) || 0) * 100) : 0} />
+          {analyzed && face && (
+            <div style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-dim)", textAlign: "center", letterSpacing: "0.08em" }}>
+              EfficientNet-B0{multiface ? ` · Face ${selectedFace + 1} of ${faces.length}` : ""}
+            </div>
+          )}
+        </div>
+
+        {/* Classifier verdict */}
+        {analyzed && face && (
+          <div className="panel" style={{ padding: 16 }}>
+            <div className="section-label" style={{ marginBottom: 12 }}>CLASSIFIER VERDICT</div>
+            <TellSigns findings={face.findings} label={face.label} />
+          </div>
+        )}
+
         {/* Face selector tabs — only shown when 2+ faces */}
         {analyzed && multiface && (
           <div className="panel" style={{ padding: "10px 12px" }}>
@@ -230,25 +249,6 @@ export const ImageMode = () => {
                 );
               })}
             </div>
-          </div>
-        )}
-
-        {/* Confidence gauge */}
-        <div className="panel" style={{ padding: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-          <span className="section-label">CLASSIFIER SCORE</span>
-          <ConfidenceGauge value={analyzed && face ? Math.round((Number(face.confidence) || 0) * 100) : 0} />
-          {analyzed && face && (
-            <div style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-dim)", textAlign: "center", letterSpacing: "0.08em" }}>
-              EfficientNet-B0{multiface ? ` · Face ${selectedFace + 1} of ${faces.length}` : ""}
-            </div>
-          )}
-        </div>
-
-        {/* Classifier verdict */}
-        {analyzed && face && (
-          <div className="panel" style={{ padding: 16 }}>
-            <div className="section-label" style={{ marginBottom: 12 }}>CLASSIFIER VERDICT</div>
-            <TellSigns findings={face.findings} label={face.label} />
           </div>
         )}
 

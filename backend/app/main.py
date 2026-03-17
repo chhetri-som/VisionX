@@ -13,21 +13,25 @@ from pathlib import Path
 
 from app.core.config import (
     CORS_ORIGINS, API_TITLE, API_VERSION,
-    FACE_LANDMARKER_PATH, DEEPFAKE_MODEL_PATH
+    FACE_LANDMARKER_PATH, IMAGE_MODEL_PATH, AUDIO_MODEL_PATH,
+    AUDIO_TARGET_SR
 )
 from app.core.logging_config import setup_logging, get_logger
+
 from app.services.image.face_detector import FaceDetector
-from app.services.image.deepfake_classifier import DeepfakeClassifier, DummyClassifier
+from app.services.image.image_classifier import ImageClassifier
 from app.services.image.findings_engine import FindingsEngine
-from app.routes import health, image
+
+from app.services.audio.audio_classifier import AudioClassifier
+from app.services.audio.audio_preprocessor import AudioPreprocessor
+from app.routes import health, image, audio
 
 # Setup logging
 setup_logging("INFO")
 logger = get_logger(__name__)
 
-# ============================================================================
+
 # FastAPI App Setup
-# ============================================================================
 
 app = FastAPI(
     title=API_TITLE,
@@ -44,49 +48,42 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
-# ============================================================================
 # Global Model Instances
-# ============================================================================
-
 face_detector = None
-deepfake_classifier = None
+image_classifier = None
 findings_engine = None
+audio_preprocessor = None
+audio_classifier = None
 
-# ============================================================================
 # Startup Event - Load Models
-# ============================================================================
-
 @app.on_event("startup")
 async def startup_event():
     """Load models when server starts."""
-    global face_detector, deepfake_classifier, findings_engine
+    global face_detector, image_classifier, findings_engine, audio_preprocessor, audio_classifier
     
     logger.info("🚀 VisionX Backend Startup")
     logger.info("=" * 60)
     
+    logger.info('Load image analysis pipeline')
+
     # Load face detector
     try:
         face_detector = FaceDetector(FACE_LANDMARKER_PATH)
         logger.info("✅ Face Landmarker loaded")
     except Exception as e:
         logger.error(f"❌ Face Landmarker failed: {e}")
-        face_detector = None
+        raise RuntimeError(f"Failed to load Face Landmarker: {e}")
     
     # Load deepfake classifier
     try:
         # Check if model file exists
-        model_path = Path(DEEPFAKE_MODEL_PATH)
-        if model_path.exists():
-            deepfake_classifier = DeepfakeClassifier(DEEPFAKE_MODEL_PATH)
-            logger.info("✅ EfficientNet-B0 loaded")
-        else:
-            logger.warning(f"⚠️  Model not found at {DEEPFAKE_MODEL_PATH}")
-            logger.warning("   Using DummyClassifier for testing")
-            deepfake_classifier = DummyClassifier()
+        image_model_path = Path(IMAGE_MODEL_PATH)
+        if image_model_path.exists():
+            image_classifier = ImageClassifier(IMAGE_MODEL_PATH)
+            logger.info("✅ Image ML model loaded")
     except Exception as e:
-        logger.error(f"❌ EfficientNet-B0 failed: {e}")
-        logger.warning("   Using DummyClassifier for testing")
-        deepfake_classifier = DummyClassifier()
+        logger.error(f"❌ Image ML model failed: {e}")
+        raise RuntimeError(f"Failed to load image ML model: {e}")
     
     # Initialize findings engine
     try:
@@ -94,26 +91,45 @@ async def startup_event():
         logger.info("✅ FindingsEngine initialized")
     except Exception as e:
         logger.error(f"❌ FindingsEngine failed: {e}")
-        findings_engine = None
+        raise RuntimeError(f"Failed to initialize FindingsEngine: {e}")
     
+    logger.info('Load audio analysis pipeline')
+
+    # Initialize audio preprocessor
+    try:
+        audio_preprocessor = AudioPreprocessor(target_sr=AUDIO_TARGET_SR)
+        logger.info('AudioPreprocessor initialized')
+    except Exception as e:
+        logger.error(f"Failed to load Audio Preprocessor: {e}")
+        raise RuntimeError(f"Failed to load Audio Preprocessor: {e}")
+
+    # load audio classifier
+    try:
+        audio_model_path = Path(AUDIO_MODEL_PATH)
+        if audio_model_path.exists():
+            audio_classifier = AudioClassifier(AUDIO_MODEL_PATH)
+            logger.info("Audio ML model loaded")
+    except Exception as e:
+        logger.error(f'Audio ML model failed: {e}')
+        raise RuntimeError(f"Failed to load audio deepfake model: {e}")
+    
+
     # Set model instances in route modules
-    health.set_model_instances(face_detector, deepfake_classifier, findings_engine)
-    image.set_model_instances(face_detector, deepfake_classifier, findings_engine)
+    health.set_model_instances(
+        face_detector, image_classifier, findings_engine, audio_preprocessor, audio_classifier
+    )
+    image.set_model_instances(face_detector, image_classifier, findings_engine)
+    audio.set_model_instances(audio_preprocessor, audio_classifier)
     
     logger.info("=" * 60)
     logger.info("✅ Startup complete\n")
 
-# ============================================================================
 # Router Registration
-# ============================================================================
-
 app.include_router(health.router, tags=["health"])
 app.include_router(image.router, tags=["image"])
+app.include_router(audio.router, tags=["audio"])
 
-# ============================================================================
 # Startup
-# ============================================================================
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(

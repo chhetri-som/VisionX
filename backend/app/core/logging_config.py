@@ -1,13 +1,4 @@
 # backend/app/core/logging_config.py
-"""
-Centralized logging configuration for VisionX Deepfake Detection
-
-Features:
-- RotatingFileHandler with 10MB max per file
-- 5 backup files (automatically zipped)
-- Both console and file logging
-- Structured log format with timestamps
-"""
 
 import logging
 import logging.handlers
@@ -16,12 +7,7 @@ from pathlib import Path
 
 
 def setup_logging(log_level: str = "INFO") -> None:
-    """
-    Setup logging configuration for the entire application.
-    
-    Args:
-        log_level: Minimum log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    """
+    # only using INFO level logs
     
     # Create logs directory in project root
     project_root = Path(__file__).parent.parent.parent.parent  # root directory
@@ -80,20 +66,10 @@ def setup_logging(log_level: str = "INFO") -> None:
 
 
 def get_logger(name: str) -> logging.Logger:
-    """
-    Get a logger instance with the specified name.
-    
-    Args:
-        name: Usually __name__ from the calling module
-        
-    Returns:
-        Configured logger instance
-    """
     return logging.getLogger(name)
 
 
 def log_system_info() -> None:
-    """Log system information for debugging."""
     logger = logging.getLogger(__name__)
     
     try:

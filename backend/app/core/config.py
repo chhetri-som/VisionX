@@ -1,11 +1,4 @@
 # backend/app/core/config.py
-"""
-VisionX Configuration
-- Model paths
-- API settings
-- CORS configuration
-- Inference parameters
-"""
 
 import os
 from pathlib import Path
@@ -21,10 +14,19 @@ FACE_LANDMARKER_PATH = os.getenv(
 )
 
 # Deepfake classification model (ONNX)
-DEEPFAKE_MODEL_PATH = os.getenv(
-    'DEEPFAKE_MODEL_PATH',
-    str(BASE_DIR / 'app' / 'models' / 'dummy.onnx')
+IMAGE_MODEL_PATH = os.getenv(
+    'IMAGE_MODEL_PATH',
+    str(BASE_DIR / 'app' / 'models' / 'dummy_image_classifier.onnx')
 )
+
+# Audio ML model (ONNX)
+AUDIO_MODEL_PATH = os.getenv(
+    'AUDIO_MODEL_PATH',
+    str(BASE_DIR / 'app' / 'models' / 'dummy_audio_classifier.onnx')
+)
+AUDIO_TARGET_SR = 16000 # sample rate in Hz
+AUDIO_SEGMENT_LENGTH = 3.0 # seconds
+AUDIO_SEGMENT_OVERLAP = 0.5 # 50% overlap
 
 # --- CONFIDENCE THRESHOLDS ---
 # if confidence < REAL_THRESHOLD -> real
@@ -62,7 +64,8 @@ if __name__ == "__main__":
     print("=" * 60)
     print(f"Base Directory: {BASE_DIR}")
     print(f"Face Model Path: {FACE_LANDMARKER_PATH}")
-    print(f"Deepfake Model Path: {DEEPFAKE_MODEL_PATH}")
+    print(f"Image Model Path: {IMAGE_MODEL_PATH}")
+    print(f"Audio Model Path: {AUDIO_MODEL_PATH}")
     print(f"Max Image Size: {MAX_IMAGE_SIZE_MB} MB")
     print(f"CORS Origins: {CORS_ORIGINS}")
     print("=" * 60)

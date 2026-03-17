@@ -288,7 +288,7 @@ class TestResponseFormats:
             'execution_time_ms': 145,
             'model_info': {
                 'face_model': 'MediaPipe v1',
-                'deepfake_model': 'EfficientNet-B0'
+                'image_model': 'EfficientNet-B0'
             }
         }
         

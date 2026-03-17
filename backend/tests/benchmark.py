@@ -5,13 +5,13 @@ Measure latency of each pipeline stage.
 import time
 import cv2
 from app.services.face_detector import FaceDetector
-from app.services.deepfake_classifier import DeepfakeClassifier
+from app.services.image_classifier import ImageClassifier
 # from app.core.saliency_mapper import SaliencyMapper  # Removed
 
 def benchmark_pipeline():
     # Load models
     detector = FaceDetector(...)
-    classifier = DeepfakeClassifier(...)
+    classifier = ImageClassifier(...)
     # saliency = SaliencyMapper(...)  # Removed
     
     # Load test image

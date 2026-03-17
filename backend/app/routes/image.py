@@ -1,17 +1,14 @@
 # backend/app/api/routes/image.py
-"""
-Image analysis endpoint — multi-face edition.
-Classifies every detected face and returns a faces[] array.
-"""
+
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form
 import cv2
 import numpy as np
 import time
 
 from app.schemas.responses import AnalyzeResponse, FaceResult, ForensicsResponse
-from app.services.image_forensics.forensics import ForensicsService
-from app.services.image_forensics.cfa_analysis import CFAAnalyzer
-from app.services.image_forensics.fft_analysis import FFTAnalyzer
+from app.services.image.forensics import ForensicsService
+from app.services.image.cfa_analysis import CFAAnalyzer
+from app.services.image.fft_analysis import FFTAnalyzer
 from app.core.logging_config import get_logger
 from app.core.config import MAX_IMAGE_SIZE_MB
 
@@ -20,25 +17,19 @@ router = APIRouter()
 
 # loaded from main.py at startup
 face_detector       = None
-deepfake_classifier = None
+image_classifier = None
 findings_engine     = None
 
 
-def set_model_instances(fd, dfc, fe):
-    global face_detector, deepfake_classifier, findings_engine
+def set_model_instances(fd, ic, fe):
+    global face_detector, image_classifier, findings_engine
     face_detector       = fd
-    deepfake_classifier = dfc
+    image_classifier = ic
     findings_engine     = fe
 
 
 @router.post("/analyze/image", response_model=AnalyzeResponse)
 async def analyze_image(image: UploadFile = File(...)):
-    """
-    Analyze uploaded image for deepfakes.
-      - Face Detection:  MediaPipe Face Landmarker (up to 4 faces)
-      - Classification:  EfficientNet-B0 per face [0-1 confidence]
-      - Structural data: MediaPipe geometric measurements per face
-    """
     start_time = time.time()
     logger.info(
         f"/analyze/image filename={getattr(image, 'filename', None)} "
@@ -63,8 +54,8 @@ async def analyze_image(image: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Failed to decode image.")
 
         # ── Models ready? ─────────────────────────────────────────────────
-        if face_detector is None or deepfake_classifier is None or findings_engine is None:
-            raise HTTPException(status_code=500, detail="Models not loaded.")
+        if face_detector is None or image_classifier is None or findings_engine is None:
+            raise HTTPException(status_code=503, detail="Models not loaded.")
 
         # ── Face detection ────────────────────────────────────────────────
         detection = face_detector.detect(image_array)
@@ -100,7 +91,7 @@ async def analyze_image(image: UploadFile = File(...)):
 
             # Classify
             face_crop_resized = cv2.resize(face_crop, (224, 224))
-            confidence        = float(deepfake_classifier.classify(face_crop_resized))
+            confidence        = float(image_classifier.classify(face_crop_resized))
             confidence        = max(0.0, min(1.0, confidence))
 
             # Findings + structural metrics
@@ -145,7 +136,7 @@ async def analyze_image(image: UploadFile = File(...)):
             execution_time_ms = execution_time,
             model_details     = {
                 "face_model":     "MediaPipe Face Landmarker v1",
-                "deepfake_model": "EfficientNet-B0 INT8",
+                "image_model": "EfficientNet-B0 INT8",
             },
         )
 
@@ -158,27 +149,13 @@ async def analyze_image(image: UploadFile = File(...)):
 @router.post("/image/forensics", response_model=ForensicsResponse)
 async def analyze_forensics(
     file: UploadFile = File(...),
-    # Face bounding box — NORMALISED 0.0–1.0 values sent from the frontend.
-    # The frontend should normalise pixel bbox values from your ML model output.
-    # If your model returns pixel coords, divide x by image width, y by image height.
+    # if multiple faces are detected, one face is taken for analysis, multi-face forensics is too much intensive not required for now.
     has_face: bool = Form(False),
     face_x1: float = Form(0.0),
     face_y1: float = Form(0.0),
     face_x2: float = Form(1.0),
     face_y2: float = Form(1.0),
 ):
-    """
-    Unified digital forensics endpoint.
-    Returns structured signals — not raw image blobs — so the frontend can
-    present human-readable verdicts with optional expandable visualisations.
-
-    Pipeline behavior:
-    - Always runs EXIF metadata analysis
-    - If face detected: runs ELA, CFA, FFT
-    - If no face detected: skips image-dependent analyses (only metadata)
-
-    Everything runs strictly in-memory; no files are written to disk.
-    """
     logger.info(
         f"/image/forensics filename={getattr(file, 'filename', None)} "
         f"content_type={getattr(file, 'content_type', None)} "

@@ -1,14 +1,10 @@
 # backend/app/schemas/responses.py
-"""
-Response models for VisionX API.
-"""
+
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Tuple
 
 
 class FaceResult(BaseModel):
-    """Per-face classification result."""
-
     face_index: int = Field(..., description="0-based index (MediaPipe detection order)")
 
     # ── Classification ────────────────────────────────────────────────────────
@@ -31,8 +27,6 @@ class FaceResult(BaseModel):
 
 
 class AnalyzeResponse(BaseModel):
-    """Response for POST /analyze/image."""
-
     # ── Detection ────────────────────────────────────────────────────────────
     face_detected: bool = Field(...,
         description="Whether at least one face was detected")
@@ -88,7 +82,7 @@ class AnalyzeResponse(BaseModel):
                 "execution_time_ms": 210,
                 "model_details": {
                     "face_model": "MediaPipe Face Landmarker v1",
-                    "deepfake_model": "EfficientNet-B0 INT8",
+                    "image_model": "EfficientNet-B0 INT8",
                 },
                 "error": None,
             }
@@ -103,7 +97,8 @@ class HealthResponse(BaseModel):
     status: str = Field(..., pattern="^(ok|error)$")
     models_loaded: bool
     face_model: str
-    deepfake_model: str
+    image_model: str
+    audio_model: str
     execution_provider: str
     version: str
 
@@ -166,6 +161,91 @@ class ForensicsResponse(BaseModel):
                     "signals_flagged": 3,
                     "signals_total": 4,
                     "composite_score": 72.5,
+                },
+            }
+        }
+
+class AudioAnalysisResponse(BaseModel):
+    """ Response for POST /audio/analyze"""
+
+    filename: str = Field(..., description="Name of the uploaded audio file")
+    duration_seconds: float = Field(..., ge=0, description="Total audio duration in seconds")
+
+    # Classification
+    confidence: float = Field(..., ge=0, le=1,
+        description="Model score [0-1]; 1 = highly likely synthetic")
+    label: str = Field(..., pattern="^(real|uncertain|fake)$",
+        description="'real' | 'uncertain' | 'fake'")
+    findings: List[str] = Field(...,
+        description="2-3 plan language descriptions of the classifier result")
+
+    # Segment results
+    segments: List[Dict[str, Any]] = Field(default_factory=list,
+        description="Per-segment classification results")
+    
+    # Metadata
+    execution_time_ms: Optional[int] = Field(None, ge=0)
+    model_details: Optional[Dict[str, str]] = None
+    error: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "filename": "test.mp3",
+                "duration_seconds": 45.2,
+                "confidence": 0.87,
+                "label": "fake",
+                "findings": [
+                    "Classifier score 87 percent exceeds manipulation threshold (60%)",
+                    "Audio features consistent with speech synthesis patterns",
+                    "Recommend corroboration with additional forensic analysis",
+                ],
+                "segments": [
+                    {
+                        "segment_index": 0,
+                        "start_time": 0.0,
+                        "end_time": 3.0,
+                        "confidence": 0.89,
+                    }
+                ],
+                "execution_time_ms": 1240,
+                "model_details": {
+                    "audio_model": "Audio CNN INT8"
+                },
+                "error": None
+            }
+        }
+
+class AudioForensicsResponse(BaseModel):
+    """Response for POST /audio/forensics"""
+    filename: str
+    duration_seconds: float
+    signals: List[ForensicSignal]
+    verdict: ForensicVerdict
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "filename": "test.mp3",
+                "duration_seconds": 45.2,
+                "signals": [
+                    {
+                        "id": "spectral",
+                        "label": "Spectral Analysis",
+                        "severity": "anamalous",
+                        "score": 72,
+                        "summary": "Spectral anomalies detected - consistent with synthetic speech.",
+                        "detail": "Unnatural frequency patterns at 2.5kHz and harmonic inconsistencies.",
+                        "visualization": None,
+                    }
+                ],
+                "verdict": {
+                    "label": "LIKELY AI / DEEPFAKE",
+                    "confidence": "high",
+                    "color": "red",
+                    "signals_flagged": 2,
+                    "signals_total": 5,
+                    "composite_score": 78.0,
                 },
             }
         }
