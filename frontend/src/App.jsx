@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { ImageMode } from "./features/image";
 import { VideoMode } from "./features/video";
+import { AudioMode } from "./features/audio";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("image");
@@ -43,7 +44,7 @@ return (
 
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-secondary)", letterSpacing: "0.15em" }}>
-              EDGE-AI FORENSICS · v0.9.1
+              EDGE-AI FORENSICS · v1.0.0
             </span>
             <span className="tag tag-cyan" style={{ animation: "pulse-cyan 3s infinite" }}>SYSTEM ONLINE</span>
           </div>
@@ -68,7 +69,7 @@ return (
 
             <div className="drift-up" style={{ textAlign: "center", maxWidth: 760, position: "relative" }}>
               <div className="section-label drift-up" style={{ marginBottom: 24 }}>
-                REAL-TIME FORENSIC DEEPFAKE DETECTION
+                REAL-TIME FORENSIC DEEPFAKE DETECTION PLATFORM
               </div>
               <h1 className="text-gradient-breathe" style={{
                 fontFamily: "var(--font-display)", fontSize: "clamp(42px, 6vw, 80px)",
@@ -86,7 +87,7 @@ return (
                 color: "var(--text-secondary)", maxWidth: 560, margin: "0 auto 40px",
                 fontWeight: 400,
               }}>
-                A privacy-first, local-inference deepfake detection platform. No data leaves your device. No server. No compromise.
+                A privacy-first, local-inference platform, capable of multi-modal detection - audio, video and image analysis.
               </p>
 
               <div className="drift-up-2" style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
@@ -110,7 +111,7 @@ return (
             }}>
               {[
                 { val: "3-Signal", label: "Detection Matrix" },
-                { val: "FP16",     label: "Inference Precision" },
+                { val: "FP32",     label: "Inference Precision" },
                 { val: "ONNX",     label: "Runtime Engine" },
                 { val: "MediaPipe", label: "Geometric Analysis" },
               ].map((s, i) => (
@@ -148,14 +149,14 @@ return (
                   icon: "🔬",
                   num: "02",
                   title: "Forensic Deep-Dive",
-                  desc: "We don't just say \"Fake.\" MediaPipe facial mesh analysis reveals geometric inconsistencies in landmark positions, eye symmetry, and facial proportions.",
+                  desc: "We don't just say \"Fake.\" Each modal platform contains unique forensic analysis methods independent of the ML prediction. This provides us with a second truth to verify the analysis of the media provided.",
                   color: "var(--amber)",
                 },
                 {
                   icon: "📡",
                   num: "03",
-                  title: "Multi-Signal Analysis",
-                  desc: "Three independent signals: Spatial CNN for textures, Temporal consistency across frames, and Biological tracking of blink rates and head pose.",
+                  title: "Multi-Modal Analysis",
+                  desc: "Each media - audio, image and video contains separate ML models and analysis methodologies created specifically for the given media.",
                   color: "var(--red)",
                 },
               ].map((c, i) => (
@@ -182,42 +183,6 @@ return (
             </div>
           </section>
 
-          {/* Signal architecture strip */}
-          <section style={{
-            padding: "40px 60px",
-            borderTop: "1px solid var(--border)",
-            borderBottom: "1px solid var(--border)",
-            background: "var(--bg-tertiary)",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 0,
-            flexWrap: "wrap"
-          }}>
-            {["Spatial CNN", "→", "Temporal Diff", "→", "Biological Tracker", "→", "Multi-Signal Fusion", "→", "Forensic Output"].map((s, i) => (
-              <div key={i} className={s !== "→" ? "step-pill" : ""} style={{
-                fontFamily: s === "→" ? "monospace" : "var(--font-mono)",
-                fontSize: s === "→" ? 20 : 11,
-                color: s === "→" ? "var(--border-strong)" : i === 8 ? "var(--red)" : "var(--text-secondary)",
-                letterSpacing: "0.1em",
-                padding: s === "→" ? "0 12px" : "8px 18px",
-                background: s !== "→" ? "var(--bg-inset)" : "transparent",
-                border: s !== "→" ? "1px solid var(--border)" : "none",
-                borderRadius: 4,
-              }}>
-                {s}
-              </div>
-            ))}
-          </section>
-
-          {/* CTA to platform */}
-          <section style={{ padding: "80px 40px", textAlign: "center", background: "var(--bg-secondary)" }}>
-            <div className="section-label" style={{ marginBottom: 16 }}>READY TO ANALYZE</div>
-            <h2 style={{ fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 700, color: "var(--text-primary)", marginBottom: 24 }}>
-              Start Your Forensic Investigation
-            </h2>
-            <button className="btn-primary btn-glow" onClick={handleLaunch} style={{ fontSize: 14, padding: "18px 56px" }}>
-              <span>▶ LAUNCH ANALYZER</span>
-            </button>
-          </section>
-
           {/* ── FORENSIC WORKSPACE ── */}
           <section
             ref={workspaceRef}
@@ -239,7 +204,7 @@ return (
                 </div>
                 <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                   <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", letterSpacing: "0.1em" }}>
-                    MODEL: efficientnet-b4-ff++ · QUANT: INT8/FP16
+                    MODEL: Fine-Tuned EfficientNet-B0 · PRECISION: FP32
                   </div>
                   <span className="tag tag-green">● READY</span>
                 </div>
@@ -256,12 +221,16 @@ return (
                 <button className={`tab-btn ${activeTab === "video" ? "active" : ""}`} onClick={() => setActiveTab("video")}>
                   ▶ VIDEO ANALYSIS
                 </button>
+                <button className={`tab-btn ${activeTab === "audio" ? "active" : ""}`} onClick={() => setActiveTab("audio")}>
+                  🎵 AUDIO ANALYSIS
+                </button>
               </div>
 
               {/* Tab content */}
               <div>
                 {activeTab === "image" && <ImageMode />}
                 {activeTab === "video" && <VideoMode />}
+                {activeTab === "audio" && <AudioMode />}
               </div>
             </div>
           </section>

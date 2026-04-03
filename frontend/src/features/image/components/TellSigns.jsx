@@ -1,6 +1,3 @@
-// Classifier verdict display — shows the findings[] strings returned by
-// findings_engine._classifier_findings(). No MediaPipe geometry here.
-
 const STRIP_RE = /^[\s]*[✅❌⚠️ℹ️🟢🔴🟡]+[\s]*/u;
 
 const parseFindings = (findings) =>

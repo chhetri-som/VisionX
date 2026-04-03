@@ -108,7 +108,7 @@ class ForensicSignal(BaseModel):
     """A single forensic analysis signal with structured verdict."""
     id: str = Field(..., description="Signal identifier: metadata | ela | noise | frequency")
     label: str = Field(..., description="Human-readable signal name")
-    severity: str = Field(..., pattern="^(clean|suspicious|anomalous)$")
+    severity: str = Field(..., pattern="^(clean|suspicious|anomalous|acceptable)$")
     score: int = Field(..., ge=0, le=100, description="Risk score 0–100")
     summary: str = Field(..., description="One-line human-readable verdict")
     detail: str = Field(..., description="Technical breakdown of the signal")

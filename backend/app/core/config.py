@@ -58,14 +58,3 @@ LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-if __name__ == "__main__":
-    # Print config summary when run directly
-    print("VisionX Configuration")
-    print("=" * 60)
-    print(f"Base Directory: {BASE_DIR}")
-    print(f"Face Model Path: {FACE_LANDMARKER_PATH}")
-    print(f"Image Model Path: {IMAGE_MODEL_PATH}")
-    print(f"Audio Model Path: {AUDIO_MODEL_PATH}")
-    print(f"Max Image Size: {MAX_IMAGE_SIZE_MB} MB")
-    print(f"CORS Origins: {CORS_ORIGINS}")
-    print("=" * 60)

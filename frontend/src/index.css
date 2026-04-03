@@ -137,6 +137,152 @@ h1 {
   100% { background-position: 0% 50%; }
 }
 
+/* Score counter animation — bouncy entrance */
+@keyframes score-counter {
+  0% { 
+    opacity: 0; 
+    transform: scale(0.75) translateY(16px);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.12) translateY(-2px);
+  }
+  100% { 
+    opacity: 1; 
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Signal cascade — staggered entrance from left */
+@keyframes signal-cascade {
+  0% { 
+    opacity: 0; 
+    transform: translateX(-20px) translateY(10px);
+  }
+  100% { 
+    opacity: 1; 
+    transform: translateX(0) translateY(0);
+  }
+}
+
+/* Verdict card breathing pulse — matches verdict color */
+@keyframes verdict-pulse-green {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(92, 138, 60, 0.4);
+  }
+  50% { 
+    box-shadow: 0 0 0 10px rgba(92, 138, 60, 0);
+  }
+}
+
+@keyframes verdict-pulse-amber {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(184, 134, 11, 0.4);
+  }
+  50% { 
+    box-shadow: 0 0 0 10px rgba(184, 134, 11, 0);
+  }
+}
+
+@keyframes verdict-pulse-red {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(184, 76, 58, 0.4);
+  }
+  50% { 
+    box-shadow: 0 0 0 10px rgba(184, 76, 58, 0);
+  }
+}
+
+/* Loading shimmer effect */
+@keyframes loading-shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+/* Floating icon during analysis */
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+/* Signal row highlight on hover */
+@keyframes signal-glow {
+  0% { 
+    background-color: inherit;
+    border-color: currentColor;
+  }
+  50% {
+    background-color: rgba(174, 183, 132, 0.06);
+  }
+  100% { 
+    background-color: inherit;
+  }
+}
+
+/* Confidence arc stroke animation */
+@keyframes arc-draw {
+  0% { 
+    stroke-dashoffset: 188;
+    opacity: 0;
+  }
+  100% { 
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+/* Risk scale indicator movement */
+@keyframes risk-indicator {
+  0% { 
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Utility class animations */
+.animate-score-counter {
+  animation: score-counter 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-signal-cascade {
+  animation: signal-cascade 0.5s ease-out both;
+}
+
+.animate-verdict-pulse {
+  animation: verdict-pulse-green 2.4s ease-in-out infinite;
+}
+
+.animate-verdict-pulse.amber {
+  animation: verdict-pulse-amber 2.4s ease-in-out infinite;
+}
+
+.animate-verdict-pulse.red {
+  animation: verdict-pulse-red 2.4s ease-in-out infinite;
+}
+
+.animate-loading-shimmer {
+  animation: loading-shimmer 2s infinite;
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-elevated) 50%,
+    var(--bg-tertiary) 100%
+  );
+  background-size: 1000px 100%;
+}
+
+.animate-float {
+  animation: float-gentle 2s ease-in-out infinite;
+}
+
+.animate-risk-indicator {
+  animation: risk-indicator 0.6s ease-out both;
+}
+
 .fade-in { animation: fadeIn 0.4s ease-out; }
 .fade-in-1 { animation: fadeIn 0.4s 0.1s ease-out both; }
 .fade-in-2 { animation: fadeIn 0.4s 0.2s ease-out both; }

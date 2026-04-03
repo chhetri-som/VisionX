@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { ConfidenceGauge } from "../image/components/ConfidenceGauge";
+import { ConfidenceGauge } from "../../common/ConfidenceGauge";
 
 const generateTimelineData = () =>
   Array.from({ length: 60 }, (_, i) => {

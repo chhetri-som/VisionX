@@ -1,4 +1,4 @@
-export const ConfidenceGauge = ({ value, label }) => {
+export const ConfidenceGauge = ({ value, label, subLabel = "FORGERY" }) => {
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (value / 100) * circumference;
@@ -27,7 +27,7 @@ export const ConfidenceGauge = ({ value, label }) => {
             {value}%
           </span>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-secondary)", letterSpacing: "0.1em", marginTop: 4 }}>
-            FORGERY
+            {subLabel}
           </span>
         </div>
       </div>
