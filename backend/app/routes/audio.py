@@ -1,29 +1,21 @@
-# backend/app/routes/audio.py
-
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 import tempfile
 import os
 from pathlib import Path
 
 from app.schemas.responses import AudioAnalysisResponse, AudioForensicsResponse
 from app.core.logging_config import get_logger
+from app.dependencies import get_audio_preprocessor, get_audio_classifier
 
 logger = get_logger(__name__)
 router = APIRouter()
 
-# initialized in main.py
-audio_preprocessor = None
-audio_classifier = None
-
-def set_model_instances(ap, ac):
-    global audio_preprocessor, audio_classifier
-    audio_preprocessor = ap
-    audio_classifier = ac
-
 @router.post("/analyze/audio", response_model=AudioAnalysisResponse)
-async def analyze_audio(file: UploadFile = File(...)):
-    if audio_preprocessor is None or audio_classifier is None:
-        raise HTTPException(status_code=503, detail="Audio models not initialized")
+async def analyze_audio(
+    file: UploadFile = File(...), 
+    audio_preprocessor=Depends(get_audio_preprocessor), 
+    audio_classifier=Depends(get_audio_classifier)
+):
 
     temp_file_path = None
     try:
@@ -117,12 +109,13 @@ async def analyze_audio(file: UploadFile = File(...)):
 
 
 @router.post("/audio/forensics", response_model=AudioForensicsResponse)
-async def analyze_audio_forensics(file: UploadFile = File(...)):
-    if audio_preprocessor is None or audio_classifier is None:
-        raise HTTPException(status_code=503, detail="Audio models not loaded")
-    
-    temp_file_path = None
+async def analyze_audio_forensics(
+    file: UploadFile = File(...),
+    audio_preprocessor = Depends(get_audio_preprocessor),
+    audio_classifier = Depends(get_audio_classifier)
+):
 
+    temp_file_path = None
     try:
         allowed_types = ["audio/mpeg", "audio/wav"]
         if file.content_type not in allowed_types:
