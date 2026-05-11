@@ -122,62 +122,95 @@ class FFTAnalyzer:
             vis_b64 = base64.b64encode(buffer).decode("utf-8") if is_success else None
 
             # --- Scoring ---
+            # Three independent signals, no hard overrides that nullify each other.
+            #
+            # Signal 1 — axis-aligned grid peaks (primary GAN indicator)
+            #   Transposed convolutions leave harmonically spaced peaks along the
+            #   horizontal and vertical center lines of the spectrum. Real photos
+            #   rarely produce more than 1-3 such local maxima above the threshold.
+            #
+            # Signal 2 — overall spectral peak density
+            #   Real photos have a smooth frequency falloff; few pixels reach 35% of
+            #   the off-DC maximum. GAN images with regular upsampling patterns
+            #   produce many pixels of comparable magnitude, raising the count.
+            #
+            # Signal 3 — symmetric peak distribution (minor reinforcing signal)
+            #   The DFT magnitude of any real-valued image is always Hermitian-
+            #   symmetric, so this is NOT an independent GAN indicator on its own.
+            #   We only apply it as a small bonus when significant peaks already exist,
+            #   confirming they are structured rather than incidental.
+
             score = 0
             flags = []
 
-            if peak_count > (N**2)*FFTAnalyzer.PEAK_THRESHOLD:
-                score += 55
-                flags.append(f"Very high spectral peak count ({peak_count}) — strong GAN/upsampling artefact pattern.")
-            elif peak_count > (N**2)*FFTAnalyzer.PEAK_THRESHOLD / 10:
-                score += 28
-                flags.append(f"Elevated spectral peaks ({peak_count}) — possible synthetic generation.")
+            # Signal 1: axis peaks (most reliable)
+            if axis_peaks > 10:
+                score += 45
+                flags.append(
+                    f"Strong periodic axis peaks ({axis_peaks}) — convolution grid artefact "
+                    f"consistent with GAN upsampling layers."
+                )
+            elif axis_peaks > 4:
+                score += 22
+                flags.append(
+                    f"Moderate axis-aligned peaks ({axis_peaks}) — possible upsampling artefact."
+                )
             else:
-                flags.append(f"Low spectral peak count ({peak_count}) — within natural range.")
+                flags.append(
+                    f"Few axis-aligned peaks ({axis_peaks}) — consistent with natural image."
+                )
 
-            if symmetry_score > 0.65:
-                score += 30
-                flags.append(f"High spectral symmetry ({symmetry_score:.2f}) — consistent with synthetic generation.")
-            elif symmetry_score > 0.45:
-                score += 12
-                flags.append(f"Moderate spectral symmetry ({symmetry_score:.2f}).")
+            # Signal 2: peak density
+            if peak_count > 2000:
+                score += 35
+                flags.append(
+                    f"High spectral peak density ({peak_count} pixels above threshold) — "
+                    f"strong periodic artefact pattern."
+                )
+            elif peak_count > 400:
+                score += 15
+                flags.append(
+                    f"Elevated spectral peaks ({peak_count}) — above natural baseline."
+                )
             else:
-                flags.append(f"Low spectral symmetry ({symmetry_score:.2f}).")
+                flags.append(
+                    f"Low spectral peak count ({peak_count}) — within natural range."
+                )
 
-            if axis_peaks > 35:
-                score += 20
-                flags.append(f"Axis-aligned periodic peaks ({axis_peaks}) — suggests convolution grid artefacts.")
-            else:
-                flags.append(f"Axis-aligned periodic peaks ({axis_peaks}) - suggestsconvolution grid artefacts.")
-
-            # Adjusted scoring system
-            if peak_count <= (N**2)*FFTAnalyzer.PEAK_THRESHOLD / 10:
-                score = 0
-                flags = [f"Low spectral peak count ({peak_count}) — within natural range."]
-            elif symmetry_score <= 0.45 or axis_peaks <= 35:
-                score = 20
-                flags.append(f"No anomalous characteristics detected.")
+            # Signal 3: symmetric peaks (minor reinforcer, only when peaks exist)
+            if peak_count > 400 and symmetry_score > 0.60:
+                score += 10
+                flags.append(
+                    f"Symmetric peak distribution ({symmetry_score:.2f}) — reinforces "
+                    f"structured/periodic origin."
+                )
 
             score = min(score, 100)
 
-            if score >= 70:
+            if score >= 60:
                 severity = "anomalous"
                 summary = flags[0]
-            elif score >= 45:
+            elif score >= 30:
                 severity = "suspicious"
                 summary = flags[0]
             else:
                 severity = "clean"
-                summary = f"Frequency spectrum appears natural (peaks: {peak_count}, symmetry: {symmetry_score:.2f})."
+                summary = (
+                    f"Frequency spectrum appears natural "
+                    f"(axis peaks: {axis_peaks}, density: {peak_count})."
+                )
 
             return {
                 "severity": severity,
                 "score": score,
                 "summary": summary,
                 "detail": (
-                    f"2D FFT on {N}×{N} image. Spectral peaks (>{FFTAnalyzer.PEAK_THRESHOLD*100:.0f}% max): {peak_count}. "
-                    f"Symmetry score: {symmetry_score:.3f}. Axis peaks: {axis_peaks}. "
-                    "Green dots in the visualisation mark anomalous frequency peaks; "
-                    "a regular grid pattern indicates AI-generator artefacts."
+                    f"2D FFT on {N}×{N} region. "
+                    f"Off-DC spectral peaks (>{FFTAnalyzer.PEAK_THRESHOLD*100:.0f}% of max): {peak_count}. "
+                    f"Axis-aligned peaks: {axis_peaks}. "
+                    f"Symmetry score: {symmetry_score:.3f}. "
+                    "Green dots mark off-centre peaks above the threshold; "
+                    "a regular grid pattern along the axes indicates AI upsampling artefacts."
                 ),
                 "visualization": f"data:image/jpeg;base64,{vis_b64}" if vis_b64 else None,
             }

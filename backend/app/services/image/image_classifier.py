@@ -1,110 +1,116 @@
-# backend/app/services/image_classifier.py
-
-import onnxruntime as ort
-import numpy as np
+import re
+import json
+import base64
 import cv2
-from pathlib import Path
+import numpy as np
+from llama_cpp import Llama
+from llama_cpp.llama_chat_format import Qwen3VLChatHandler
 from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-
 class ImageClassifier:
-    def __init__(self, model_path: str):
+    def __init__(self, model_path: str, mmproj_path: str = None):
+
         self.model_path = model_path
-        
+        self.mmproj_path = mmproj_path
         try:
-            # Load ONNX model
-            # Use CPU by default; add CUDAExecutionProvider if GPU available
-            self.session = ort.InferenceSession(
-                model_path,
-                providers=['CPUExecutionProvider']
-                # For GPU: providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
+            self.llm = Llama(
+                model_path=self.model_path,
+                chat_handler=Qwen3VLChatHandler(
+                    clip_model_path=self.mmproj_path,
+                    force_reasoning=True,
+                    image_min_tokens=1024,
+                ),
+                n_ctx=8192, 
+                n_gpu_layers=-1,
+                flash_attn=True, 
+                verbose=False
             )
-            
-            # Get input/output info
-            self.input_name = self.session.get_inputs()[0].name
-            self.output_name = self.session.get_outputs()[0].name
-            self.input_shape = self.session.get_inputs()[0].shape
-            self.output_shape = self.session.get_outputs()[0].shape
-            
-            logger.info(f"✅ ImageClassifier loaded from {model_path}")
-            logger.info(f"   Input: {self.input_name}, shape: {self.input_shape}")
-            logger.info(f"   Output: {self.output_name}, shape: {self.output_shape}")
-        
+            logger.info(f" Qwen3-VL-4B Classifier loaded from {model_path}")
+            logger.info(f"Vision Model loaded from: {self.mmproj_path}")
         except Exception as e:
-            logger.error(f"❌ Failed to load classifier: {e}")
-            raise RuntimeError(f"Classifier initialization failed: {e}")
-    
+            logger.error(f" Failed to load Qwen VLM: {e}")
+            raise RuntimeError(f"VLM initialization failed: {e}")
+
     def classify(self, face_image: np.ndarray) -> float:
         try:
-            # Preprocess image
-            preprocessed = self._preprocess(face_image)
+            base64_image = self._preprocess_to_base64(face_image)
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are a deepfake detection agent. Analyze the structural geometry, textures, and blending of the provided face. Try to find ways to detect if the given image is AI-generated or real. Reason step-by-step, but keep your reasoning concise. More importantly, keep your reasoning concise as well. Basically, dont stress to hard bro. To maintain efficiency focus ONLY on the 3 most critical forensic artifacts (aiming for max 200 words). After reasoning, provide your conclusion in a markdown JSON block containing ONLY the key 'fake_probability' with a float value between 0.0 (completely real) and 1.0 (completely fake)."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}},
+                        {"type": "text", "text": "Analyze this face crop and provide the fake_probability JSON."}
+                    ]
+                }
+            ]
+
+            response = self.llm.create_chat_completion(
+                messages=messages,
+                temperature=0.3,
+                max_tokens=2048
+            )
+            result_text = response["choices"][0]["message"]["content"]
+            #DEBUG
+            logger.info("================ RAW LLM DUMP ================\n" 
+                        f"{result_text}\n"
+                        "==============================================")
             
-            # Run inference
-            outputs = self.session.run([self.output_name], {self.input_name: preprocessed})
-            logits = outputs[0][0]  # [num_classes]
+            think_match = re.search(r'(?:<think>\s*)?(.*?)</think>', result_text, re.DOTALL | re.IGNORECASE)
+            reasoning = think_match.group(1).strip() if think_match else "No explicit reasoning provided."
+            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', result_text, re.DOTALL)
             
-            # Convert logits to probability
-            fake_prob = self._logits_to_prob(logits)
-            
-            return float(fake_prob)
-        
-        except Exception as e:
-            logger.error(f"Inference failed: {e}")
-            raise RuntimeError(f"Classification failed: {e}")
-    
-    def _preprocess(self, image: np.ndarray) -> np.ndarray:
-        # Convert BGR → RGB
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        
-        # Resize to 224×224
-        image_resized = cv2.resize(image_rgb, (224, 224))
-        
-        # Normalize to [0, 1]
-        image_normalized = image_resized.astype(np.float32) / 255.0
-        
-        # Check model's expected input format
-        # Most models expect [batch, height, width, channels] or [batch, channels, height, width]
-        if len(self.input_shape) == 4:
-            if self.input_shape[1] == 3:
-                # [batch, channels, height, width] - convert HWC → CHW
-                batch = np.transpose(image_normalized, (2, 0, 1))  # CHW
-                batch = np.expand_dims(batch, axis=0)              # BCHW
+            if json_match:
+                json_str = json_match.group(1).strip()
+                parsed = json.loads(json_str)
             else:
-                # [batch, height, width, channels] - keep HWC
-                batch = np.expand_dims(image_normalized, axis=0)   # BHWC
-        else:
-            # Fallback to BHWC
-            batch = np.expand_dims(image_normalized, axis=0)
-        
-        return batch.astype(np.float32)
-    
-    def _logits_to_prob(self, logits: np.ndarray) -> float:
-        """
-        Handles both:
-        - Raw logits: applies softmax
-        - Pre-computed probabilities: uses directly
-        
-        Assumes binary classification: [real, fake]
-        Returns probability of class 1 (fake)
-        """
-        # Check if already probabilities (all values in [0, 1])
-        if logits.max() <= 1.0 and logits.min() >= 0.0 and abs(logits.sum() - 1.0) < 0.01:
-            # Already probabilities
-            probs = logits
-        else:
-            # Raw logits - apply softmax
-            # Numerically stable softmax
-            logits_shifted = logits - logits.max()
-            exp_logits = np.exp(logits_shifted)
-            probs = exp_logits / exp_logits.sum()
-        
-        # Return probability of "fake" class (index 1)
-        if len(probs) >= 2:
-            fake_prob = probs[1]
-        else:
-            # Fallback: single output treated as fake probability
-            fake_prob = probs[0]
-        
-        return float(fake_prob)
+                # ROBUST FALLBACK: Hunt for the actual curly braces
+                start = result_text.find('{')
+                end = result_text.rfind('}')
+                if start != -1 and end != -1 and end > start:
+                    json_str = result_text[start:end+1]
+                    parsed = json.loads(json_str)
+                else:
+                    # Token Starvation Check
+                    logger.warning("No curly braces found in VLM response. The model may have hit the max_tokens limit before finishing.")
+                    parsed = {"fake_probability": 0.5}
+
+            fake_prob = float(parsed.get("fake_probability", 0.5))
+            return max(0.0, min(1.0, fake_prob)), reasoning
+            
+        except Exception as e:
+            logger.error(f"VLM Classification failed: {e}")
+            # Graceful degradation: return uncertain (0.5) if parsing fails
+            return 0.5, "Analysis failed due to a processing error."
+
+    def chat_inference(self, user_prompt: str, forensic_thoughts: str, history: list = None) -> str:
+        try:
+            messages = [{"role": "system", "content": f"You are 'Xite', a helpful GenZ AI assistant, you are part of a deepfake detection platform with a forensic dashboard. Here is the reasoning from the vision engine upon analysis of the provide image by the user:\n\n{forensic_thoughts}\n\n. Please use it strictly when necessary. Your main task is to answer the user's questions and query. Only use  content from 'forensic_thoughts' if it is applicable to the user's query. Try to keep your response short, you can go on for a few paragraphs. More importantly, keep your reasoning concise as well. Basically, dont stress to hard bro. Be a bit GenZ, have a cool lingo and talk to the point, keep it to a minimal. Most importantly, have fun"}]
+            
+            if history:
+                messages.extend(history[-6:])
+
+            messages.append({"role": "user", "content": user_prompt})
+
+            response = self.llm.create_chat_completion(
+                messages=messages,
+                temperature=0.7,
+                max_tokens=2048
+            )
+            return response["choices"][0]["message"]["content"]
+        except Exception as e:
+            logger.error(f"Chat inference failed: {e}")
+            raise RuntimeError("Failed to generate chat response.")
+
+    def _preprocess_to_base64(self, image: np.ndarray) -> str:     
+
+        success, buffer = cv2.imencode('.jpg', image)
+        if not success:
+            raise ValueError("Could not encode image to JPEG")
+            
+        return base64.b64encode(buffer).decode('utf-8')

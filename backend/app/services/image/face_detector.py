@@ -34,10 +34,10 @@ class FaceDetector:
                 output_facial_transformation_matrixes=False,
             )
             self.landmarker = mp.tasks.vision.FaceLandmarker.create_from_options(options)
-            logger.info("✅ Face Landmarker loaded (num_faces=4)")
+            logger.info(" Face Landmarker loaded (num_faces=4)")
 
         except Exception as e:
-            logger.error(f"❌ Failed to load Face Landmarker: {e}")
+            logger.error(f" Failed to load Face Landmarker: {e}")
             raise RuntimeError(f"Face Landmarker initialization failed: {e}")
 
     def detect(self, image_array: np.ndarray) -> Dict:

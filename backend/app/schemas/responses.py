@@ -1,5 +1,4 @@
-# backend/app/schemas/responses.py
-
+import json
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Tuple
 
@@ -14,7 +13,8 @@ class FaceResult(BaseModel):
         description="'real' | 'uncertain' | 'fake'")
     findings: List[str] = Field(...,
         description="2-3 plain-language descriptions of the classifier result")
-
+    reasoning: Optional[str] = Field(None,
+        description="The <think> block reasoning extracted from the VLM for chat context")
     # ── MediaPipe structural data ─────────────────────────────────────────────
     landmarks: Optional[List[Tuple[int, int]]] = Field(
         None, description="468 facial landmark points, absolute pixel coords")
@@ -57,6 +57,7 @@ class AnalyzeResponse(BaseModel):
                             "EfficientNet-B0 found texture and frequency patterns consistent with synthetic image generation",
                             "Corroborate with additional forensic tools before drawing conclusions",
                         ],
+                        "reasoning": "The facial geometry appears to be mid as fucc",
                         "landmarks": [[100, 150], [102, 148]],
                         "bbox": [80, 120, 200, 240],
                         "face_confidence": 0.95,
@@ -101,6 +102,24 @@ class HealthResponse(BaseModel):
     audio_model: str
     execution_provider: str
     version: str
+
+class ChatMessage(BaseModel):
+    role: str = Field(..., description="'system', 'user', or 'assistant'")
+    content: str = Field(..., description="The message text or thinking block")
+
+class ChatInferenceResponse(BaseModel):
+    reply: str = Field(..., description="The VLM's markdown text/thinking response")
+    execution_time_ms: Optional[int] = Field(None, ge=0)
+    error: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "reply": "<think>Gabagool</think>",
+                "execution_time_ms": 4200,
+                "error": None
+            }
+        }
 
 # ── Forensics ─────────────────────────────────────────────────────────────────
 

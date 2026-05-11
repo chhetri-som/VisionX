@@ -13,7 +13,7 @@ from pathlib import Path
 
 from app.core.config import (
     CORS_ORIGINS, API_TITLE, API_VERSION,
-    FACE_LANDMARKER_PATH, IMAGE_MODEL_PATH, AUDIO_MODEL_PATH,
+    FACE_LANDMARKER_PATH, IMAGE_MODEL_PATH, MMPROJ_PATH, AUDIO_MODEL_PATH,
     AUDIO_TARGET_SR
 )
 from app.core.logging_config import setup_logging, get_logger
@@ -61,7 +61,7 @@ async def startup_event():
     """Load models when server starts."""
     global face_detector, image_classifier, findings_engine, audio_preprocessor, audio_classifier
     
-    logger.info("🚀 VisionX Backend Startup")
+    logger.info("VisionX Backend Startup")
     logger.info("=" * 60)
     
     logger.info('Load image analysis pipeline')
@@ -69,28 +69,31 @@ async def startup_event():
     # Load face detector
     try:
         face_detector = FaceDetector(FACE_LANDMARKER_PATH)
-        logger.info("✅ Face Landmarker loaded")
+        logger.info(" Face Landmarker loaded")
     except Exception as e:
-        logger.error(f"❌ Face Landmarker failed: {e}")
+        logger.error(f" Face Landmarker failed: {e}")
         raise RuntimeError(f"Failed to load Face Landmarker: {e}")
     
     # Load deepfake classifier
     try:
         # Check if model file exists
         image_model_path = Path(IMAGE_MODEL_PATH)
-        if image_model_path.exists():
-            image_classifier = ImageClassifier(IMAGE_MODEL_PATH)
-            logger.info("✅ Image ML model loaded")
+        mmproj_path = Path(MMPROJ_PATH)
+        if image_model_path.exists() and mmproj_path.exists():
+            image_classifier = ImageClassifier(
+                model_path=IMAGE_MODEL_PATH, 
+                mmproj_path=MMPROJ_PATH)
+            logger.info(" Image ML model loaded")
     except Exception as e:
-        logger.error(f"❌ Image ML model failed: {e}")
-        raise RuntimeError(f"Failed to load image ML model: {e}")
+        logger.error(f" Image ML model failed: {e}")
+        raise RuntimeError(f"Failed to load image ML model or MultiModal Projector: {e}")
     
     # Initialize findings engine
     try:
         findings_engine = FindingsEngine()
-        logger.info("✅ FindingsEngine initialized")
+        logger.info(" FindingsEngine initialized")
     except Exception as e:
-        logger.error(f"❌ FindingsEngine failed: {e}")
+        logger.error(f" FindingsEngine failed: {e}")
         raise RuntimeError(f"Failed to initialize FindingsEngine: {e}")
     
     logger.info('Load audio analysis pipeline')
@@ -122,7 +125,7 @@ async def startup_event():
     audio.set_model_instances(audio_preprocessor, audio_classifier)
     
     logger.info("=" * 60)
-    logger.info("✅ Startup complete\n")
+    logger.info(" Startup complete\n")
 
 # Router Registration
 app.include_router(health.router, tags=["health"])

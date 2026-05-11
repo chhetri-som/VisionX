@@ -13,10 +13,16 @@ FACE_LANDMARKER_PATH = os.getenv(
     str(BASE_DIR / 'app' / 'models' / 'face_landmarker.task')
 )
 
-# Deepfake classification model (ONNX)
+# Deepfake classification model
 IMAGE_MODEL_PATH = os.getenv(
     'IMAGE_MODEL_PATH',
-    str(BASE_DIR / 'app' / 'models' / 'dummy_image_classifier.onnx')
+    str(BASE_DIR / 'app' / 'models' / 'qwen3_4bit_base.gguf')
+)
+
+# MMPROJ FOR QWEN3
+MMPROJ_PATH = os.getenv(
+    'MMPROJ_PATH',
+    str(BASE_DIR / 'app' / 'models' / 'mmproj-Qwen_Qwen3-VL-4B-Thinking-f16.gguf')
 )
 
 # Audio ML model (ONNX)

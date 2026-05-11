@@ -4,6 +4,7 @@ import { HeatmapView } from "./components/HeatmapView";
 import { ConfidenceGauge } from "../../common/ConfidenceGauge";
 import { TellSigns } from "./components/TellSigns";
 import { FacialAnalysis } from "./components/FacialAnalysis";
+import { XiteChat } from "./components/XiteChat";
 import ForensicsPanel from "./components/ForensicsPanel"; 
 
 export const ImageMode = () => {
@@ -14,6 +15,7 @@ export const ImageMode = () => {
   const [previewUrl,    setPreviewUrl]    = useState(null);
   const [selectedFace,  setSelectedFace]  = useState(0);
   const [selectedFile,  setSelectedFile]  = useState(null); 
+  const [forensicThoughts, setForensicThoughts] = useState(""); 
   const fileInputRef = useRef(null);
 
   const analyzeFile = async (file) => {
@@ -23,6 +25,7 @@ export const ImageMode = () => {
     setResult(null);
     setShowMediaPipe(false);
     setSelectedFace(0);
+    setForensicThoughts("");
 
     try {
       const form = new FormData();
@@ -41,6 +44,14 @@ export const ImageMode = () => {
 
       const data = await res.json();
       setResult(data);
+      
+      // Extract reasoning from the primary face (index 0) if available
+      if (data.faces && data.faces.length > 0 && data.faces[0].reasoning) {
+        setForensicThoughts(data.faces[0].reasoning);
+      } else {
+        setForensicThoughts("No explicit forensic reasoning available.");
+      }
+      
       setAnalyzed(true);
     } catch (e) {
       setResult({ face_detected: false, error: e?.message || "Failed to analyze image." });
@@ -69,6 +80,19 @@ export const ImageMode = () => {
 
   return (
     <>
+      {/* Hidden file input for NEW IMAGE button */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleFileChange(e.target.files[0]);
+          }
+        }}
+      />
+
       {/* Idle state - full width upload only */}
       {!analyzed && !analyzing && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -255,6 +279,7 @@ export const ImageMode = () => {
           </div>
         </div>
       )}
+      <XiteChat selectedFile={selectedFile} forensicThoughts={forensicThoughts} />
     </>
   );
 };
