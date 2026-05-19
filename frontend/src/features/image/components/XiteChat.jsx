@@ -288,7 +288,7 @@ export const XiteChat = ({ selectedFile, forensicThoughts }) => {
   // ── Welcome copy ──────────────────────────────────────────────────────────────
   const introText = selectedFile
     ? "Hello, I am Xite, your chatbot of assistance. What would you like to discuss about?"
-    : "Hello, I am Xite, your chatbot of assistance. Kindly upload any form of media in their respective places so that I can help you analyze further.";
+    : "Hello, I am Xite, your chatbot of assistance. Kindly upload an image so that I can help you analyze further.";
 
   const sendDisabled = !selectedFile || isLoading || !inputText.trim();
 

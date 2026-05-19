@@ -20,7 +20,7 @@ async def analyze_audio(
     temp_file_path = None
     try:
         # allowed file formats
-        allowed_types = ["audio/mpeg", "audio/wav"]
+        allowed_types = ["audio/mpeg", "audio/wav", "audio/x-m4a", "audio/mp4"]
         if file.content_type not in allowed_types:
             raise HTTPException(status_code=400, detail=f"Invalid file type. Only WAV, MP3, and M4A files are allowed. Received: {file.content_type}")
 
@@ -38,22 +38,16 @@ async def analyze_audio(
 
         duration_seconds = len(audio_array) / audio_preprocessor.target_sr
 
-        # segment audio
+        # global inference for confidence score
+        overall_confidence = audio_classifier.classify(audio_array, audio_preprocessor.target_sr)
+        # segment inference for UI timeline granularity
         segments = audio_preprocessor.segment_audio(audio_array, audio_preprocessor.target_sr)
-        # extract features and classify each segment
-        segment_confidences = []
-        for segment in segments:
-            features = audio_preprocessor.extract_mfcc_features(segment, audio_preprocessor.target_sr)
-            confidence = audio_classifier.classify(features)
-            segment_confidences.append(confidence)
-
-        # calculate overall confidence
-        overall_confidence = sum(segment_confidences) / len(segment_confidences) if segment_confidences else 0.5
-
+        segment_confidences = audio_classifier.classify(segments, audio_preprocessor.target_sr)
+        
         # labels
-        if overall_confidence > 0.7:
+        if overall_confidence > 0.6:
             label = "fake"
-        elif overall_confidence > 0.4:
+        elif overall_confidence > 0.3:
             label = "uncertain"
         else:
             label = "real"
@@ -69,7 +63,7 @@ async def analyze_audio(
         segment_results = []
         for i, conf in enumerate(segment_confidences):
             start_time = i * 3.0
-            end_time = min((i + 1) * 3.0, duration_seconds)
+            end_time = min(start_time + 3.0, duration_seconds)
             segment_results.append({
                 "segment_index": i,
                 "start_time": start_time,
@@ -88,7 +82,7 @@ async def analyze_audio(
             segments=segment_results,
             execution_time_ms=None,
             model_details={
-                "audio_model": "Audio CNN INT8",
+                "audio_model": "CLAP-htsat-fused",
             },
             error=None,
         )
@@ -117,7 +111,7 @@ async def analyze_audio_forensics(
 
     temp_file_path = None
     try:
-        allowed_types = ["audio/mpeg", "audio/wav"]
+        allowed_types = ["audio/mpeg", "audio/wav", "audio/x-m4a", "audio/mp4"]
         if file.content_type not in allowed_types:
             raise HTTPException(status_code=400, detail=f"Invalid file type. Allowed: MP3, WAV, M4A. Received: {file.content_type}")
         logger.info(f"Processing Audio Forensics for: {file.filename}")
@@ -134,19 +128,7 @@ async def analyze_audio_forensics(
 
         duration_seconds = len(audio_array) / audio_preprocessor.target_sr
 
-        # segment
-        segments =  audio_preprocessor.segment_audio(audio_array, audio_preprocessor.target_sr)
-
-        # extract features and classify each segment
-        segment_confidences = []
-        for segment in segments:
-            features = audio_preprocessor.extract_mfcc_features(segment, audio_preprocessor.target_sr)
-            confidence = audio_classifier.classify(features)
-            segment_confidences.append(confidence)
-
-        # overall confidence
-        overall_confidence = sum(segment_confidences) / len(segment_confidences) if segment_confidences else 0.5
-
+        overall_confidence = 0.5  # Placeholder - replace with actual classification logic
         # determine label
         if overall_confidence > 0.7:
             label = "fake"
@@ -159,6 +141,7 @@ async def analyze_audio_forensics(
         '''
         PLACEHOLDER LOGIC NEED TO CREATE
         forensics signals: audio_analysis_engine
+
         '''
         signals = [
             {

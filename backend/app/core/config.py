@@ -13,7 +13,7 @@ FACE_LANDMARKER_PATH = os.getenv(
     str(BASE_DIR / 'app' / 'models' / 'face_landmarker.task')
 )
 
-# Deepfake classification model
+# 4bit Qwen3 VL 4B Thinking
 IMAGE_MODEL_PATH = os.getenv(
     'IMAGE_MODEL_PATH',
     str(BASE_DIR / 'app' / 'models' / 'qwen3_4bit_base.gguf')
@@ -25,12 +25,26 @@ MMPROJ_PATH = os.getenv(
     str(BASE_DIR / 'app' / 'models' / 'mmproj-Qwen_Qwen3-VL-4B-Thinking-f16.gguf')
 )
 
-# Audio ML model (ONNX)
-AUDIO_MODEL_PATH = os.getenv(
-    'AUDIO_MODEL_PATH',
-    str(BASE_DIR / 'app' / 'models' / 'dummy_audio_classifier.onnx')
+# CLAP-htsat-fused audio encoder in ONNX export
+ONNX_AUDIO_MODEL_PATH = os.getenv(
+    'ONNX_AUDIO_MODEL_PATH',
+    str(BASE_DIR / 'app' / 'models' / 'clap_audio_encoder.onnx')
 )
-AUDIO_TARGET_SR = 16000 # sample rate in Hz
+
+# CLAP-htsat-fused text embeddings obtained for text encoder
+CLAP_TEXT_EMBEDDINGS_PATH = os.getenv(
+    'CLAP_TEXT_EMBEDDINGS_PATH',
+    str(BASE_DIR / 'app' / 'models' / 'clap_text_embeddings.npy')
+)
+
+# CLAP-htsat-fused processor
+CLAP_PROCESSOR_PATH = os.getenv(
+    'CLAP_PROCESSOR_PATH',
+    str(BASE_DIR / 'app' / 'models' / 'CLAP-htsat-fused')
+)
+
+
+AUDIO_TARGET_SR = 48000 # CLAP natively operates beat at 48kHz
 AUDIO_SEGMENT_LENGTH = 3.0 # seconds
 AUDIO_SEGMENT_OVERLAP = 0.5 # 50% overlap
 

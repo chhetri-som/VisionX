@@ -44,7 +44,7 @@ return (
 
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-secondary)", letterSpacing: "0.15em" }}>
-              EDGE-AI FORENSICS · v1.0.0
+              v2.1.2
             </span>
             <span className="tag tag-cyan" style={{ animation: "pulse-cyan 3s infinite" }}>SYSTEM ONLINE</span>
           </div>
@@ -99,7 +99,7 @@ return (
                   fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-secondary)",
                 }}>
                   <span style={{ color: "var(--green)", fontSize: 16 }}>●</span>
-                  INFERENCE: LOCAL · LATENCY: &lt;50ms
+                  INFERENCE: LOCAL · LATENCY: &lt;150ms
                 </div>
               </div>
             </div>
@@ -111,8 +111,8 @@ return (
             }}>
               {[
                 { val: "3-Signal", label: "Detection Matrix" },
-                { val: "FP32",     label: "Inference Precision" },
-                { val: "ONNX",     label: "Runtime Engine" },
+                { val: "FP16",     label: "Inference Precision" },
+                { val: "ONNX & Llama",     label: "Runtime Engine" },
                 { val: "MediaPipe", label: "Geometric Analysis" },
               ].map((s, i) => (
                 <div key={i} style={{ textAlign: "center" }}>
@@ -142,7 +142,7 @@ return (
                   icon: "🔐",
                   num: "01",
                   title: "Local Processing",
-                  desc: "All inference runs entirely on your device via ONNX Runtime. Your face data never touches a server. Privacy is the architecture.",
+                  desc: "All inference runs entirely on your device via ONNX Runtime & Llama.cpp. Your face data never touches a server. Privacy is the architecture.",
                   color: "var(--cyan)",
                 },
                 {
@@ -204,7 +204,7 @@ return (
                 </div>
                 <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                   <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", letterSpacing: "0.1em" }}>
-                    MODEL: Fine-Tuned EfficientNet-B0 · PRECISION: FP32
+                    MODEL: Qwen3-VL-4B-Thinking & CLAP-htsat-fused
                   </div>
                   <span className="tag tag-green">● READY</span>
                 </div>
@@ -243,10 +243,10 @@ return (
             display: "flex", justifyContent: "space-between", alignItems: "center",
           }}>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", letterSpacing: "0.12em" }}>
-              VISIONX · FORENSIC DEEPFAKE DETECTION · EDGE-AI PLATFORM
+              VISIONX ● v2.1.2
             </span>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", letterSpacing: "0.12em" }}>
-              ALL INFERENCE LOCAL · ZERO DATA TRANSMISSION
+              Proof of Concept
             </span>
           </footer>
         </div>

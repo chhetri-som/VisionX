@@ -17,11 +17,6 @@ logger = get_logger(__name__)
 
 
 class FaceDetector:
-    """
-    Detects up to 4 faces using MediaPipe Face Landmarker.
-    detect() returns all detected faces so the route can classify each one.
-    """
-
     def __init__(self, model_asset_path: str = None):
         try:
             base_options = mp.tasks.BaseOptions(
@@ -34,33 +29,13 @@ class FaceDetector:
                 output_facial_transformation_matrixes=False,
             )
             self.landmarker = mp.tasks.vision.FaceLandmarker.create_from_options(options)
-            logger.info(" Face Landmarker loaded (num_faces=4)")
+            logger.info(" Face Landmarker loaded")
 
         except Exception as e:
             logger.error(f" Failed to load Face Landmarker: {e}")
             raise RuntimeError(f"Face Landmarker initialization failed: {e}")
 
     def detect(self, image_array: np.ndarray) -> Dict:
-        """
-        Detect all faces in an image.
-
-        Args:
-            image_array: numpy array [H, W, 3] BGR format (OpenCV)
-
-        Returns:
-            {
-                'detected':   bool,
-                'face_count': int,
-                'faces': [
-                    {
-                        'landmarks':  list[(x, y)],           # 468 pts, absolute pixels
-                        'bbox':       [x_min, y_min, x_max, y_max],
-                        'confidence': float | None             # MediaPipe blendshape score
-                    },
-                    ...
-                ]
-            }
-        """
         try:
             h, w = image_array.shape[:2]
             image_rgb = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)

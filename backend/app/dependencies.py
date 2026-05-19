@@ -1,3 +1,4 @@
+import email
 import gc
 from functools import lru_cache
 from pathlib import Path
@@ -5,7 +6,7 @@ from fastapi import HTTPException
 
 from app.core.config import (
     FACE_LANDMARKER_PATH, IMAGE_MODEL_PATH, MMPROJ_PATH,
-    AUDIO_MODEL_PATH, AUDIO_TARGET_SR
+    ONNX_AUDIO_MODEL_PATH, CLAP_TEXT_EMBEDDINGS_PATH, CLAP_PROCESSOR_PATH, AUDIO_TARGET_SR
 )
 from app.core.logging_config import get_logger
 from app.services.image.face_detector import FaceDetector
@@ -62,9 +63,13 @@ def get_audio_preprocessor():
 @lru_cache()
 def get_audio_classifier():
     unload_image_models()
-    logger.info('Lazy loading Audio Classifier...')
-    audio_model_path = Path(AUDIO_MODEL_PATH)
-    if not audio_model_path.exists():
+    logger.info('Lazy loading CLAP model...')
+
+    audio_model_path = Path(ONNX_AUDIO_MODEL_PATH)
+    embeddings_path = Path(CLAP_TEXT_EMBEDDINGS_PATH)
+    processor_path = Path(CLAP_PROCESSOR_PATH)
+
+    if not audio_model_path.exists() or not embeddings_path.exists() or not processor_path.exists():
         raise HTTPException(status_code=503, detail="Audio model is missing, download it first.")
-    return AudioClassifier(AUDIO_MODEL_PATH)
+    return AudioClassifier(onnx_model_path=ONNX_AUDIO_MODEL_PATH, text_embeddings_path=CLAP_TEXT_EMBEDDINGS_PATH, processor_path=CLAP_PROCESSOR_PATH)
 
