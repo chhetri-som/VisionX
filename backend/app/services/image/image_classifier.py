@@ -3,35 +3,15 @@ import json
 import base64
 import cv2
 import numpy as np
-from llama_cpp import Llama
-from llama_cpp.llama_chat_format import Qwen3VLChatHandler
 from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 class ImageClassifier:
-    def __init__(self, model_path: str, mmproj_path: str = None):
+    def __init__(self, engine):
 
-        self.model_path = model_path
-        self.mmproj_path = mmproj_path
-        try:
-            self.llm = Llama(
-                model_path=self.model_path,
-                chat_handler=Qwen3VLChatHandler(
-                    clip_model_path=self.mmproj_path,
-                    force_reasoning=True,
-                    image_min_tokens=1024,
-                ),
-                n_ctx=8192, 
-                n_gpu_layers=-1,
-                flash_attn=True, 
-                verbose=False
-            )
-            logger.info(f" Qwen3-VL-4B Classifier loaded from {model_path}")
-            logger.info(f"Vision Model loaded from: {self.mmproj_path}")
-        except Exception as e:
-            logger.error(f" Failed to load Qwen VLM: {e}")
-            raise RuntimeError(f"VLM initialization failed: {e}")
+        self.llm = engine
+        logger.info("Image Classifier initialized with shared VLM engine")
 
     def classify(self, face_image: np.ndarray) -> float:
         try:

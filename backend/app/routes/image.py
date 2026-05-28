@@ -38,7 +38,7 @@ async def analyze_image(
         if image.content_type not in ("image/jpeg", "image/png"):
             raise HTTPException(status_code=400, detail="Invalid file type.")
 
-        nparr       = np.frombuffer(contents, np.uint8)
+        nparr = np.frombuffer(contents, np.uint8)
         image_array = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if image_array is None or image_array.size == 0:
@@ -56,7 +56,7 @@ async def analyze_image(
             )
 
         detected_faces = detection["faces"]
-        face_count     = detection["face_count"]
+        face_count = detection["face_count"]
         logger.info(f"/analyze/image: {face_count} face(s) detected")
 
         # Per-face classification loop 

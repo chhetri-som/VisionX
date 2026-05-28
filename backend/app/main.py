@@ -5,7 +5,7 @@ from app.core.config import (
     CORS_ORIGINS, API_TITLE, API_VERSION
 )
 from app.core.logging_config import setup_logging, get_logger
-from app.routes import health, image, audio
+from app.routes import health, image, audio, video, rishi
 
 setup_logging("INFO")
 logger = get_logger(__name__)
@@ -31,6 +31,8 @@ async def startup_event():
 app.include_router(health.router, tags=["health"])
 app.include_router(image.router, tags=["image"])
 app.include_router(audio.router, tags=["audio"])
+app.include_router(video.router, tags=["video"])
+app.include_router(rishi.router, tags=["rishi watermarking"])
 
 if __name__ == "__main__":
     import uvicorn

@@ -6,7 +6,7 @@ import { ForensicsPanel } from './ForensicsPanel';
 
 const visionX = {
   cream:       '#F8F3E1',
-  sage:        '#AEB784',
+  sage:        '#c5cda0ff',
   sageDark:    '#8a9460',
   olive:       '#41431B',
   oliveMid:    '#5a5c28',
@@ -22,7 +22,7 @@ const visionX = {
 /* Reusable section card */
 const Card = ({ children, style = {} }) => (
   <div style={{
-    background: `linear-gradient(145deg, ${visionX.sage} 0%, rgba(171, 175, 124, 0.9) 100%)`,
+    background: `linear-gradient(145deg, ${visionX.sage} 0%, rgba(231, 234, 199, 0.9) 100%)`,
     border: `1px solid ${visionX.oliveMid}`,
     borderRadius: '10px',
     padding: '20px',

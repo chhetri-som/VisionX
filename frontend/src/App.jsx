@@ -2,10 +2,13 @@ import { useState, useRef } from "react";
 import { ImageMode } from "./features/image";
 import { VideoMode } from "./features/video";
 import { AudioMode } from "./features/audio";
+import { WatermarkingIntro } from "./features/rishi/Watermarkingintro";
+import { WatermarkingPage } from "./features/rishi/Watermarkingpage";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("image");
-  const [view, setView] = useState("landing"); // landing | platform
+  const [view, setView] = useState("landing"); // landing | platform | watermarking
+  const [isWatermarkingPage, setIsWatermarkingPage] = useState(false);
   const workspaceRef = useRef(null);
 
   const handleLaunch = () => {
@@ -50,7 +53,13 @@ return (
           </div>
         </nav>
 
-        {/* ── LANDING ── */}
+        {/* ── WATERMARKING PAGE VIEW ── */}
+        {isWatermarkingPage && (
+          <WatermarkingPage onBack={() => setIsWatermarkingPage(false)} />
+        )}
+
+        {/* ── MAIN CONTENT ── */}
+        {!isWatermarkingPage && (
         <div style={{ paddingTop: 56 }}>
           {/* Hero */}
           <section className="grid-bg" style={{
@@ -183,6 +192,11 @@ return (
             </div>
           </section>
 
+          {/* ── WATERMARKING INTRO ── */}
+          <WatermarkingIntro
+            onExplore={() => setIsWatermarkingPage(true)}
+          />
+
           {/* ── FORENSIC WORKSPACE ── */}
           <section
             ref={workspaceRef}
@@ -250,6 +264,7 @@ return (
             </span>
           </footer>
         </div>
+        )}
       </div>
   );
 }

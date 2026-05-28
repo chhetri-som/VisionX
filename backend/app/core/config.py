@@ -48,6 +48,11 @@ AUDIO_TARGET_SR = 48000 # CLAP natively operates beat at 48kHz
 AUDIO_SEGMENT_LENGTH = 3.0 # seconds
 AUDIO_SEGMENT_OVERLAP = 0.5 # 50% overlap
 
+VIDEO_MAX_DURATION_SEC = 10
+VIDEO_FPS = 2
+VIDEO_MAX_PIXELS = 100352 # 316x316
+VIDEO_MIN_PIXELS = 3136 # 56x56
+
 # --- CONFIDENCE THRESHOLDS ---
 # if confidence < REAL_THRESHOLD -> real
 REAL_THRESHOLD = 0.3
@@ -57,10 +62,30 @@ UNCERTAIN_THRESHOLD = 0.6
 
 # --- API SETTINGS ---
 API_TITLE = "VisionX"
-API_VERSION = "1.0.0"
+API_VERSION = "2.1.2"
 
 # Maximum image file size (in MB)
 MAX_IMAGE_SIZE_MB = 10
+MAX_VIDEO_SIZE_MB = 50
+
+# --- WATERMARKING SETTINGS (RISHI) ---
+# Directory for storing ECDSA and AES cryptographic keys
+WATERMARK_KEYS_DIR = os.getenv(
+    'WATERMARK_KEYS_DIR',
+    str(BASE_DIR / 'app' / 'keys')
+)
+
+# Core Shamir / FEC Parameters
+WATERMARK_MAX_SHARES = 255
+WATERMARK_THRESHOLD_FRACTION = 0.6
+WATERMARK_FEC_NSYM = 64
+WATERMARK_STRENGTH = 2.0
+
+# Fallback parameters for the detector if .wm_meta.json is missing
+# (143 is the standard share length after Reed-Solomon encoding with 64 FEC symbols)
+WATERMARK_DEFAULT_SHARE_LEN = 143
+# (153 is 60% of the 255 maximum shares)
+WATERMARK_DEFAULT_THRESHOLD = 153
 
 # --- CORS CONFIGURATION ---
 # These are the frontend origins that can make requests to this backend

@@ -1,5 +1,5 @@
 const visionX = {
-  cream:       '#F8F3E1',
+  cream:       '#eee5c6ff',
   sage:        '#AEB784',
   sageDark:    '#8a9460',
   olive:       '#41431B',
@@ -59,7 +59,7 @@ export const ForensicsPanel = ({ data }) => {
       {/* Composite Score Header */}
       <div style={{
         padding: '16px 20px',
-        background: `linear-gradient(135deg, ${visionX.inkLight} 0%, rgba(65, 67, 27, 0.4) 100%)`,
+        background: `linear-gradient(135deg, ${visionX.sage} 0%, rgba(217, 218, 192, 0.4) 100%)`,
         border: `1px solid ${visionX.oliveMid}`,
         borderRadius: '8px',
         display: 'flex',
@@ -91,7 +91,7 @@ export const ForensicsPanel = ({ data }) => {
               fontWeight: '800',
               color: visionX.cream,
               lineHeight: 1,
-            }}>{data.verdict.composite_score}</span>
+            }}>{parseFloat(data.verdict.composite_score).toFixed(3)}</span>
             <span style={{
               fontFamily: "var(--font-mono)",
               fontSize: '13px',
@@ -150,7 +150,7 @@ export const ForensicsPanel = ({ data }) => {
               border: `1px solid ${visionX.oliveMid}`,
               borderRadius: '8px',
               overflow: 'hidden',
-              background: visionX.inkLight,
+              background: visionX.warmGrayLight,
             }}>
 
               {/* Signal Header */}
@@ -160,7 +160,7 @@ export const ForensicsPanel = ({ data }) => {
                 justifyContent: 'space-between',
                 padding: '10px 14px',
                 borderBottom: `1px solid ${visionX.oliveMid}`,
-                background: 'rgba(65, 67, 27, 0.25)',
+                background: visionX.sageDark,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {/* Severity color bar */}
@@ -186,13 +186,13 @@ export const ForensicsPanel = ({ data }) => {
 
                 <span style={{
                   padding: '3px 8px',
-                  background: sev.bg,
+                  background: visionX.cream,
                   border: `1px solid ${sev.border}`,
                   borderRadius: '3px',
                   fontFamily: "var(--font-mono)",
                   fontSize: '8px',
                   fontWeight: '700',
-                  color: sev.text,
+                  color: visionX.warmGray,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
                 }}>
@@ -215,7 +215,7 @@ export const ForensicsPanel = ({ data }) => {
                 <p style={{
                   fontFamily: "var(--font-mono)",
                   fontSize: '10px',
-                  color: visionX.warmGrayLight,
+                  color: visionX.cream,
                   margin: 0,
                   lineHeight: '1.65',
                   letterSpacing: '0.02em',
