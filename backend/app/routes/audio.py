@@ -63,6 +63,8 @@ async def analyze_audio(
         segment_results = []
         for i, conf in enumerate(segment_confidences):
             start_time = i * 3.0
+            if start_time >= duration_seconds:
+                break
             end_time = min(start_time + 3.0, duration_seconds)
             segment_results.append({
                 "segment_index": i,
@@ -111,7 +113,7 @@ async def analyze_audio_forensics(
 
     temp_file_path = None
     try:
-        allowed_types = ["audio/mpeg", "audio/wav", "audio/x-m4a", "audio/mp4"]
+        allowed_types = ["audio/mpeg", "video/mpeg", "audio/wav", "audio/x-m4a", "audio/mp4"]
         if file.content_type not in allowed_types:
             raise HTTPException(status_code=400, detail=f"Invalid file type. Allowed: MP3, WAV, M4A. Received: {file.content_type}")
         logger.info(f"Processing Audio Forensics for: {file.filename}")

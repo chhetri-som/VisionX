@@ -268,3 +268,122 @@ class AudioForensicsResponse(BaseModel):
                 },
             }
         }
+
+
+class FrameResult(BaseModel):
+    """Classification result for a single video frame."""
+    frame_index: int = Field(..., description="0-based frame number in video")
+    timestamp_seconds: float = Field(..., ge=0, description="Timestamp in seconds")
+    confidence: float = Field(..., ge=0, le=1,
+        description="VLM score [0-1]; 1 = highly likely synthetic")
+    label: str = Field(..., pattern="^(real|uncertain|fake)$",
+        description="'real' | 'uncertain' | 'fake'")
+    findings: List[str] = Field(...,
+        description="2-3 plain-language descriptions of the classifier result")
+    reasoning: Optional[str] = Field(None,
+        description="The <think> block reasoning extracted from the VLM")
+    image_base64: Optional[str] = Field(None,
+        description="Base64-encoded JPEG frame for visualization")
+
+
+class VideoAnalyzeResponse(BaseModel):
+    """Response for POST /analyze/video."""
+    face_detected: bool = Field(...,
+        description="Whether at least one face was detected")
+    frames_analyzed: int = Field(..., ge=0,
+        description="Number of valid face frames extracted and analyzed")
+    aggregate_confidence: float = Field(..., ge=0, le=1,
+        description="Average confidence score across all frames")
+    label: str = Field(..., pattern="^(real|uncertain|fake)$",
+        description="Aggregate classification label")
+    aggregate_events: List[str] = Field(...,
+        description="Consolidated findings across all frames")
+    aggregate_reasoning: str = Field(...,
+        description="Aggregated reasoning from the VLM")
+    frame_details: List[FrameResult] = Field(default_factory=list,
+        description="Per-frame classification results with base64 images")
+    execution_time_ms: Optional[int] = Field(None, ge=0)
+    model_details: Optional[Dict[str, str]] = None
+    error: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "face_detected": True,
+                "frames_analyzed": 45,
+                "aggregate_confidence": 0.78,
+                "label": "fake",
+                "aggregate_events": [
+                    "Consistent deep fake signals detected across 78% of frames",
+                    "Facial inconsistencies and warping patterns detected",
+                    "VLM analysis indicates high probability of synthetic manipulation"
+                ],
+                "aggregate_reasoning": "The video shows consistent signs of synthetic generation with smooth interpolation artifacts",
+                "frame_details": [
+                    {
+                        "frame_index": 0,
+                        "timestamp_seconds": 0.0,
+                        "confidence": 0.75,
+                        "label": "fake",
+                        "findings": [
+                            "Classifier score 75% exceeds manipulation threshold (60%)",
+                            "Frame shows digital artifacts consistent with face synthesis"
+                        ],
+                        "reasoning": "Facial geometry appears artificially smooth",
+                        "image_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                    }
+                ],
+                "execution_time_ms": 8500,
+                "model_details": {
+                    "face_model": "MediaPipe Face Landmarker v1",
+                    "video_model": "Qwen3-VL-4B-Thinking (4-bit)"
+                },
+                "error": None
+            }
+        }
+
+
+class WatermarkDetectResponse(BaseModel):
+    """Response for POST /watermark/detect."""
+    status: str = Field(..., pattern="^(verified|unverified)$",
+        description="'verified' if watermark found and signature valid, 'unverified' otherwise")
+    message: Optional[str] = Field(None,
+        description="Error or status message when verification fails")
+    metadata: Optional[Dict[str, Any]] = Field(None,
+        description="Extracted watermark payload (creator_id, model_id, timestamp, video_hash)")
+    frames_analyzed: Optional[str] = Field(None,
+        description="Frames used vs total analyzed (e.g. '180/240')")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "status": "verified",
+                "metadata": {
+                    "creator_id": "visionx_system",
+                    "model_id": "visionx_local_inference",
+                    "timestamp": "2026-06-05T14:30:00.123456",
+                    "video_hash": "sha256_hash_value"
+                },
+                "frames_analyzed": "180/240",
+                "message": None
+            }
+        }
+
+
+class WatermarkEmbedResponse(BaseModel):
+    """Documentation for POST /watermark/embed (returns file download)."""
+    filename: str = Field(...,
+        description="Watermarked output filename (.mkv format)")
+    format: str = Field(..., pattern="^mkv$",
+        description="Output format (Matroska container)")
+    lossless: bool = Field(True,
+        description="Whether the watermarking process is lossless")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "filename": "watermarked_video_20260605_143000.mkv",
+                "format": "mkv",
+                "lossless": True
+            }
+        }

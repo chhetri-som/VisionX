@@ -68,7 +68,7 @@ API_VERSION = "2.1.2"
 MAX_IMAGE_SIZE_MB = 10
 MAX_VIDEO_SIZE_MB = 50
 
-# --- WATERMARKING SETTINGS (RISHI) ---
+# --- WATERMARKING SETTINGS ---
 # Directory for storing ECDSA and AES cryptographic keys
 WATERMARK_KEYS_DIR = os.getenv(
     'WATERMARK_KEYS_DIR',
@@ -86,6 +86,8 @@ WATERMARK_STRENGTH = 2.0
 WATERMARK_DEFAULT_SHARE_LEN = 143
 # (153 is 60% of the 255 maximum shares)
 WATERMARK_DEFAULT_THRESHOLD = 153
+# (79 is the original secret length before the 64 byte FEC padding: 143 - 64 = 79)
+WATERMARK_DEFAULT_SECRET_LEN = 79
 
 # --- CORS CONFIGURATION ---
 # These are the frontend origins that can make requests to this backend

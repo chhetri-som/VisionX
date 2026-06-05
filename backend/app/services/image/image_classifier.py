@@ -19,7 +19,7 @@ class ImageClassifier:
             messages = [
                 {
                     "role": "system",
-                    "content": "You are a deepfake detection agent. Analyze the structural geometry, textures, and blending of the provided face. Try to find ways to detect if the given image is AI-generated or real. Reason step-by-step, but keep your reasoning concise. More importantly, keep your reasoning concise as well. Basically, dont stress to hard bro. To maintain efficiency focus ONLY on the 3 most critical forensic artifacts (aiming for max 200 words). After reasoning, provide your conclusion in a markdown JSON block containing ONLY the key 'fake_probability' with a float value between 0.0 (completely real) and 1.0 (completely fake)."
+                    "content": "You are given a face cropped image. You have to analyze the image and determine the probability of it being a deepfake. Try to find intuitive ways to figure this out. However, you must make sure to conclude your analysis eventually. Please do not reason for too long that you lose the point of things.After reasoning, provide your conclusion in a markdown JSON block containing ONLY the key 'fake_probability' with a float value between 0.0 (real) and 1.0 (fake)."
                 },
                 {
                     "role": "user",
@@ -33,7 +33,7 @@ class ImageClassifier:
             response = self.llm.create_chat_completion(
                 messages=messages,
                 temperature=0.3,
-                max_tokens=2048
+                max_tokens=3072
             )
             result_text = response["choices"][0]["message"]["content"]
             #DEBUG
@@ -41,24 +41,39 @@ class ImageClassifier:
                         f"{result_text}\n"
                         "==============================================")
             
-            think_match = re.search(r'(?:<think>\s*)?(.*?)</think>', result_text, re.DOTALL | re.IGNORECASE)
+            think_match = re.search(r'<think>(.*?)</think>', result_text, re.DOTALL | re.IGNORECASE)
             reasoning = think_match.group(1).strip() if think_match else "No explicit reasoning provided."
-            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', result_text, re.DOTALL)
-            
+
+            # Strip the thinking block so template JSON in system prompt doesn't interfere
+            clean_text = re.sub(r'<think>.*?</think>', '', result_text, flags=re.DOTALL | re.IGNORECASE).strip()
+
+            parsed = None
+
+            # 1. Try fenced code block first
+            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', clean_text, re.DOTALL)
             if json_match:
-                json_str = json_match.group(1).strip()
-                parsed = json.loads(json_str)
-            else:
-                # ROBUST FALLBACK: Hunt for the actual curly braces
-                start = result_text.find('{')
-                end = result_text.rfind('}')
-                if start != -1 and end != -1 and end > start:
-                    json_str = result_text[start:end+1]
-                    parsed = json.loads(json_str)
-                else:
-                    # Token Starvation Check
-                    logger.warning("No curly braces found in VLM response. The model may have hit the max_tokens limit before finishing.")
-                    parsed = {"fake_probability": 0.5}
+                try:
+                    parsed = json.loads(json_match.group(1).strip())
+                except json.JSONDecodeError:
+                    pass
+
+            # 2. Grab ALL {...} blocks and take the last valid one
+            if parsed is None:
+                candidates = re.findall(r'\{[^{}]+\}', clean_text)
+                for candidate in reversed(candidates):  # last match = the output JSON
+                    try:
+                        parsed = json.loads(candidate)
+                        break
+                    except json.JSONDecodeError:
+                        continue
+
+            # 3. Token starvation fallback
+            if parsed is None:
+                logger.warning(
+                    "No valid JSON found in VLM response. "
+                    "Model may have hit max_tokens limit before finishing."
+                )
+                parsed = {"fake_probability": 0.5}
 
             fake_prob = float(parsed.get("fake_probability", 0.5))
             return max(0.0, min(1.0, fake_prob)), reasoning

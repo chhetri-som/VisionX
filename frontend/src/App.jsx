@@ -4,11 +4,13 @@ import { VideoMode } from "./features/video";
 import { AudioMode } from "./features/audio";
 import { WatermarkingIntro } from "./features/rishi/Watermarkingintro";
 import { WatermarkingPage } from "./features/rishi/Watermarkingpage";
+import { WatermarkTool } from "./features/rishi/Watermarkingtool";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("image");
   const [view, setView] = useState("landing"); // landing | platform | watermarking
   const [isWatermarkingPage, setIsWatermarkingPage] = useState(false);
+  const [isWatermarkingTool, setIsWatermarkingTool] = useState(false);
   const workspaceRef = useRef(null);
 
   const handleLaunch = () => {
@@ -53,9 +55,17 @@ return (
           </div>
         </nav>
 
+        {/* ── WATERMARKING TOOL VIEW ── */}
+        {isWatermarkingTool && (
+          <WatermarkTool onBack={() => setIsWatermarkingTool(false)} />
+        )}
+
         {/* ── WATERMARKING PAGE VIEW ── */}
-        {isWatermarkingPage && (
-          <WatermarkingPage onBack={() => setIsWatermarkingPage(false)} />
+        {isWatermarkingPage && !isWatermarkingTool && (
+          <WatermarkingPage 
+            onBack={() => setIsWatermarkingPage(false)}
+            onLaunchTool={() => setIsWatermarkingTool(true)}
+          />
         )}
 
         {/* ── MAIN CONTENT ── */}

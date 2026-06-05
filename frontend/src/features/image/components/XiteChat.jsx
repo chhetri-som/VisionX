@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
 
 const API_BASE = "http://127.0.0.1:8000";
 const WINDOW_W  = 340;
@@ -96,7 +97,19 @@ const XITE_STYLES = `
   .xite-input:focus                             { outline: none; border-color: rgba(0,0,0,0.18) !important; }
   .xite-send:not(:disabled):hover               { background: rgba(0,0,0,0.14) !important; color: rgba(0,0,0,0.88) !important; }
   .xite-think-btn:hover                         { color: rgba(0,0,0,0.4) !important; }
+  .xite-markdown p                              { margin: 0.3em 0; }
+  .xite-markdown ul, .xite-markdown ol          { margin: 0.3em 0 0.3em 1.2em; padding: 0; }
+  .xite-markdown li                             { margin: 0.2em 0; }
+  .xite-markdown strong                         { font-weight: 600; color: rgba(0,0,0,0.78); }
+  .xite-markdown em                             { font-style: italic; }
+  .xite-markdown code                           { background: rgba(0,0,0,0.06); padding: 2px 4px; border-radius: 3px; font-family: var(--font-mono); font-size: 0.9em; }
+  .xite-markdown pre                            { background: rgba(0,0,0,0.06); padding: 8px; border-radius: 5px; overflow-x: auto; margin: 0.4em 0; }
+  .xite-markdown pre code                       { background: none; padding: 0; }
+  .xite-markdown h1, .xite-markdown h2, .xite-markdown h3 { font-weight: 600; margin: 0.4em 0 0.2em; font-size: 1em; }
+  .xite-markdown blockquote                     { border-left: 3px solid rgba(0,0,0,0.15); padding-left: 10px; margin: 0.3em 0; color: rgba(0,0,0,0.5); }
+  .xite-markdown a                              { color: rgba(59,130,246,0.8); text-decoration: underline; cursor: pointer; }
 `;
+
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -509,7 +522,9 @@ export const XiteChat = ({ selectedFile, forensicThoughts }) => {
                     wordBreak:    "break-word",
                     whiteSpace:   "pre-wrap",
                   }}>
-                    {msg.content}
+                    <div className="xite-markdown">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
                   </div>
 
                   {/* Thinking toggle */}
@@ -557,7 +572,9 @@ export const XiteChat = ({ selectedFile, forensicThoughts }) => {
                             wordBreak:    "break-word",
                           }}
                         >
-                          {msg.thinking}
+                          <div className="xite-markdown" style={{ fontSize: "0.9em" }}>
+                            <ReactMarkdown>{msg.thinking}</ReactMarkdown>
+                          </div>
                         </div>
                       )}
                     </>

@@ -209,7 +209,7 @@ export const ImageMode = () => {
                 <ConfidenceGauge value={analyzed && face ? Math.round((Number(face.confidence) || 0) * 100) : 0} />
                 {analyzed && face && (
                   <div style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-dim)", textAlign: "center", letterSpacing: "0.08em" }}>
-                    EfficientNet-B0{multiface ? ` · Face ${selectedFace + 1} of ${faces.length}` : ""}
+                    Qwen3 VLM{multiface ? ` · Face ${selectedFace + 1} of ${faces.length}` : ""}
                   </div>
                 )}
               </div>
