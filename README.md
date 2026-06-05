@@ -33,7 +33,7 @@ Edge AI Deepfake Detection with a Forensic Dashboard
 
 <h3>Xite assistant in Image Mode</h3>
 <div align="center">
-<img src="./assets/xite.png" alt="xite">
+<img src="./assets/xite.png" width=70% height=70% alt="xite">
 </div>
 
 <h3>Video Mode</h3>
