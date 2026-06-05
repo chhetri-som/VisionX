@@ -7,41 +7,41 @@ Edge AI Deepfake Detection with a Forensic Dashboard
 
 
 <h3>Landing Page</h3>
-<div align="center">
-<img src="./assets/landing_page.png" width=70% height=70% alt="landing page">
+<div align="left">
+<img src="./assets/landing_page.png" width=80% height=80% alt="landing page">
 </div>
 
 <h3>How it Works?</h3>
-<div align="center">
-<img src="./assets/how_it_works.png" width=70% height=70% alt="how it works">
+<div align="left">
+<img src="./assets/how_it_works.png" width=80% height=80% alt="how it works">
 </div>
 
 <h3>Watermark Intro</h3>
-<div align="center">
-<img src="./assets/watermark_intro.png" alt="watermark intro">
+<div align="left">
+<img src="./assets/watermark_intro.png" width=80% height=80% alt="watermark intro">
 </div>
 
 <h3>Media Tab Navigation</h3>
-<div align="center">
-<img src="./assets/media_tab.png" alt="tab nav">
+<div align="left">
+<img src="./assets/media_tab.png" width=80% height=80% alt="tab nav">
 </div>
 
 <h3>Image Mode</h3>
-<div align="center">
-<img src="./assets/image_mode.png" alt="image mode">
+<div align="left">
+<img src="./assets/image_mode.png" width=80% height=80% alt="image mode">
 </div>
 
 <h3>Xite assistant in Image Mode</h3>
-<div align="center">
-<img src="./assets/xite.png" width=70% height=70% alt="xite">
+<div align="left">
+<img src="./assets/xite.png" width=50% height=50% alt="xite">
 </div>
 
 <h3>Video Mode</h3>
-<div align="center">
-<img src="./assets/video_mode.png" alt="video mode">
+<div align="left">
+<img src="./assets/video_mode.png" width=80% height=80% alt="video mode">
 </div>
 
 <h3>Audio Mode</h3>
-<div align="center">
-<img src="./assets/audio_mode.png" alt="audio mode">
+<div align="left">
+<img src="./assets/audio_mode.png" width=80% height=80% alt="audio mode">
 </div>
