@@ -8,12 +8,12 @@ Edge AI Deepfake Detection with a Forensic Dashboard
 
 <h3>Landing Page</h3>
 <div align="center">
-<img src="./assets/landing_page.png" alt="landing page">
+<img src="./assets/landing_page.png" width=70% height=70% alt="landing page">
 </div>
 
 <h3>How it Works?</h3>
 <div align="center">
-<img src="./assets/how_it_works.png" alt="how it works">
+<img src="./assets/how_it_works.png" width=70% height=70% alt="how it works">
 </div>
 
 <h3>Watermark Intro</h3>
